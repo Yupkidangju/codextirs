@@ -1,0 +1,582 @@
+﻿<!--
+  Dual Tetris Battle: Neon Wars
+  [v3.12.0] 메인 HTML - Neon Shift HUD 메타와 피버/듀얼 레이어 UI 확장
+  
+  작성일: 2026-03-02
+  작성자: AI Agent
+-->
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <title>Dual Tetris Battle: Neon Wars</title>
+  <meta name="description" content="AI와의 대전형 테트리스 배틀 게임 - Neon Wars" />
+  <meta name="theme-color" content="#050810" />
+  <link rel="stylesheet" href="./styles/main.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;600;700;800&display=swap" rel="stylesheet" />
+</head>
+<body>
+  <!-- 배경 효과 캔버스 -->
+  <canvas id="bgFx" class="bg-fx" width="1920" height="1080" aria-hidden="true"></canvas>
+
+  <!-- 시작 화면 -->
+  <section id="startScreen" class="start-screen">
+    <div class="start-card">
+      <p class="eyebrow">Dual Tetris Battle</p>
+      <h1>NEON WARS</h1>
+      <p class="subtitle">난이도를 선택하고 전투를 시작하세요</p>
+      
+      <div id="difficultyGrid" class="difficulty-grid">
+        <button class="diff-btn" data-difficulty="병아리" data-level="0">
+          <span class="diff-tag">튜토리얼</span>
+          <span class="emoji">🐤</span>
+          <span class="label">병아리</span>
+          <span class="stats">800ms · 초보</span>
+        </button>
+        <button class="diff-btn" data-difficulty="하수인" data-level="1">
+          <span class="diff-tag">입문</span>
+          <span class="emoji">👤</span>
+          <span class="label">하수인</span>
+          <span class="stats">600ms · 입문</span>
+        </button>
+        <button class="diff-btn active" data-difficulty="기사" data-level="2">
+          <span class="diff-tag recommended">추천</span>
+          <span class="emoji">⚔️</span>
+          <span class="label">기사</span>
+          <span class="stats">450ms · 표준</span>
+        </button>
+        <button class="diff-btn" data-difficulty="마왕군주" data-level="3">
+          <span class="diff-tag caution">도전</span>
+          <span class="emoji">👹</span>
+          <span class="label">마왕군주</span>
+          <span class="stats">300ms · 상급</span>
+        </button>
+        <button class="diff-btn danger" data-difficulty="데몬킹" data-level="4">
+          <span class="diff-tag danger">위험</span>
+          <span class="emoji">💀</span>
+          <span class="label">데몬킹</span>
+          <span class="stats">180ms · 지옥</span>
+        </button>
+      </div>
+      
+      <div class="start-actions">
+        <button id="startBattleBtn" class="start-battle">START BATTLE</button>
+        <button id="briefingOpenBtn" class="start-battle briefing-btn">BRIEFING</button>
+      </div>
+      <div id="recentBattleCard" class="recent-battle-card hidden" aria-live="polite">
+        <span class="meta-label">LAST RESULT</span>
+        <strong id="recentBattleResult">-</strong>
+        <span id="recentBattleMeta">최근 전투 기록 없음</span>
+      </div>
+      <section class="mission-panel" aria-labelledby="missionTitle">
+        <div class="mission-head">
+          <div>
+            <p class="eyebrow">Onboarding 2.0</p>
+            <h2 id="missionTitle">MISSION CHECKLIST</h2>
+          </div>
+          <strong id="missionProgressValue">0 / 5</strong>
+        </div>
+        <div id="missionChecklist" class="mission-checklist"></div>
+      </section>
+    </div>
+  </section>
+
+  <!-- 메인 앱 컨테이너 -->
+  <div id="app" class="app">
+    <!-- 상단 바 -->
+    <header class="topbar">
+      <h1>DUAL TETRIS BATTLE</h1>
+      <div class="controls-row">
+        <span id="difficultyBadge" class="difficulty-badge">AI: 기사</span>
+        <button id="startBtn" class="neon-btn">TITLE</button>
+        <button id="pauseBtn" class="neon-btn">PAUSE</button>
+        <button id="settingsBtn" class="neon-btn">SETTINGS</button>
+      </div>
+    </header>
+
+    <!-- 모바일 상태 바 (점수/콤보/레벨/게이지 한 줄) -->
+    <section id="mobileStatusBar" class="mobile-status-bar">
+      <div class="status-item">
+        <span class="label">SCORE</span>
+        <span class="value" id="mobileScore">0</span>
+      </div>
+      <div class="status-item">
+        <span class="label">COMBO</span>
+        <span class="value combo" id="mobileCombo">x0</span>
+      </div>
+      <div class="status-item">
+        <span class="label">LEVEL</span>
+        <span class="value" id="mobileLevel">1</span>
+      </div>
+      <div class="status-item gauge-item">
+        <span class="label">SPECIAL</span>
+        <div class="mobile-gauge">
+          <div class="mobile-gauge-fill" id="mobileGaugeFill" style="--gauge-percent: 0%"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 게임 스테이지: 3컬럼 레이아웃 -->
+    <main id="stage" class="stage desktop prestart">
+      
+      <!-- 왼쪽: 플레이어 레인 -->
+      <section class="lane player-lane">
+        <h2 class="lane-title">PLAYER</h2>
+        
+        <!-- 플레이어 보드 -->
+        <div class="board-wrap">
+          <canvas id="playerCanvas" width="300" height="600"></canvas>
+        </div>
+        
+        <!-- 플레이어 사이드 패널 (HOLD + NEXT) -->
+        <div class="side-panel player-side">
+          <!-- HOLD -->
+          <div class="block-preview hold-preview">
+            <div class="label">HOLD [C]</div>
+            <canvas id="holdCanvas" width="80" height="80"></canvas>
+          </div>
+          
+          <!-- NEXT 블록들 -->
+          <div class="block-preview next-preview">
+            <div class="label">NEXT</div>
+            <canvas id="next1Canvas" width="80" height="60"></canvas>
+            <canvas id="next2Canvas" width="80" height="60"></canvas>
+            <canvas id="next3Canvas" width="80" height="60"></canvas>
+            <canvas id="next4Canvas" class="extra-next" width="80" height="60"></canvas>
+            <canvas id="next5Canvas" class="extra-next" width="80" height="60"></canvas>
+          </div>
+        </div>
+      </section>
+
+      <!-- 가운데: 상태/점수 패널 -->
+      <section class="center-panel">
+        <!-- VS 인디케이터 -->
+        <div class="vs-indicator">VS</div>
+        
+        <!-- 메인 HUD -->
+        <div class="main-hud">
+          <!-- 점수 패널 -->
+          <div class="hud-panel score-panel">
+            <div class="label">SCORE</div>
+            <div class="value" id="scoreValue">0</div>
+          </div>
+          
+          <!-- 콤보 패널 -->
+          <div class="hud-panel combo-panel">
+            <div class="label">COMBO</div>
+            <div class="value combo" id="comboValue">x0</div>
+          </div>
+          
+          <!-- 레벨 패널 -->
+          <div class="hud-panel level-panel">
+            <div class="label">LEVEL</div>
+            <div class="value" id="levelValue">1</div>
+          </div>
+          
+          <!-- 특수 게이지 -->
+          <div class="gauge-wrapper">
+            <div class="gauge-container" id="specialGauge">
+              <div class="gauge-bg"></div>
+              <div class="gauge-fill" style="--gauge-percent: 0%"></div>
+              <div class="gauge-inner">
+                <div class="gauge-value" id="gaugeValue">0%</div>
+                <div class="label">SPECIAL</div>
+              </div>
+            </div>
+          </div>
+          
+          <!-- 스킬 버튼 영역 [v5.0.0] -->
+          <div class="skills-panel" id="skillsPanel">
+            <div class="skills-title">SKILLS</div>
+            <div class="skill-buttons">
+              <button class="skill-btn" id="skillBtn1" data-skill="blind" disabled>
+                <span class="skill-key">1</span>
+                <span class="skill-name">블라인드</span>
+                <span class="skill-desc">상대 시야 차단</span>
+              </button>
+              <button class="skill-btn" id="skillBtn2" data-skill="swap" disabled>
+                <span class="skill-key">2</span>
+                <span class="skill-name">블록 스왑</span>
+                <span class="skill-desc">상대 블록 교환</span>
+              </button>
+              <button class="skill-btn" id="skillBtn3" data-skill="reflect" disabled>
+                <span class="skill-key">3</span>
+                <span class="skill-name">가비지 반사</span>
+                <span class="skill-desc">공격 반사 (5초)</span>
+              </button>
+            </div>
+            <div class="skills-hint">키 1, 2, 3 또는 클릭으로 사용</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 오른쪽: AI 레인 -->
+      <section class="lane ai-lane">
+        <h2 class="lane-title">AI</h2>
+        
+        <!-- AI 보드 -->
+        <div class="board-wrap">
+          <canvas id="aiCanvas" width="300" height="600"></canvas>
+        </div>
+        
+        <!-- AI 사이드 패널 -->
+        <div class="side-panel ai-side">
+          <div class="hud-panel ai-level-panel">
+            <div class="label">AI LEVEL</div>
+            <div class="value" id="aiLevelValue">기사</div>
+          </div>
+          <div class="hud-panel boss-hp-panel">
+            <div class="label">BOSS HP</div>
+            <div class="boss-hp-bar">
+              <div class="boss-hp-fill" id="bossHpFill" style="--boss-hp-percent: 100%"></div>
+            </div>
+            <div class="value" id="bossHpValue">100%</div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <aside id="battleWidgets" class="battle-widgets">
+      <section class="widget-card status-widget" aria-live="polite">
+        <div class="widget-head">
+          <span class="widget-label">STATUS</span>
+          <span class="widget-value" id="statusCountValue">0</span>
+        </div>
+        <div id="statusEffects" class="status-effects">
+          <div class="status-empty">활성 상태 없음</div>
+        </div>
+      </section>
+      <section class="widget-card incoming-widget" aria-live="polite">
+        <div class="widget-head">
+          <span class="widget-label">INCOMING</span>
+          <span class="widget-value incoming" id="incomingValue">0</span>
+        </div>
+        <div id="incomingQueue" class="incoming-queue">
+          <div class="incoming-empty">위협 없음</div>
+        </div>
+      </section>
+    </aside>
+  </div>
+
+  <!-- 모바일 컨트롤 -->
+  <section id="mobileControls" class="mobile-controls hidden">
+    <button data-action="left" aria-label="왼쪽 이동">◀</button>
+    <button data-action="rotate" aria-label="회전">⟳</button>
+    <button data-action="right" aria-label="오른쪽 이동">▶</button>
+    <button data-action="softDrop" aria-label="소프트 드롭">▼</button>
+    <button data-action="hardDrop" aria-label="하드 드롭">⤓</button>
+    <button data-action="hold" aria-label="홀드">H</button>
+    <button data-action="skill1" aria-label="블라인드 스킬" disabled>1</button>
+    <button data-action="skill2" aria-label="블록 스왑 스킬" disabled>2</button>
+    <button data-action="skill3" aria-label="가비지 반사 스킬" disabled>3</button>
+  </section>
+
+  <!-- 일시정지 오버레이 -->
+  <section id="pauseOverlay" class="pause-overlay">
+    <div class="pause-menu">
+      <h2>PAUSED</h2>
+      <div class="pause-buttons">
+        <button id="resumeBtn" class="pause-btn">RESUME</button>
+        <button id="restartBtn" class="pause-btn">RESTART</button>
+        <button id="titleBtn" class="pause-btn">RETURN TO TITLE</button>
+      </div>
+    </div>
+  </section>
+
+  <section id="settingsOverlay" class="modal-overlay settings-overlay" aria-hidden="true">
+    <div class="modal-card settings-modal" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
+      <div class="modal-head">
+        <div>
+          <p class="modal-eyebrow">CONTROL CENTER</p>
+          <h2 id="settingsTitle">SETTINGS</h2>
+        </div>
+        <button id="settingsCloseBtn" class="modal-close" aria-label="설정 닫기">CLOSE</button>
+      </div>
+      <div class="settings-grid">
+        <section class="settings-group">
+          <h3>AUDIO</h3>
+          <label class="setting-row" for="masterVolumeSlider">
+            <span>MASTER</span>
+            <strong id="masterVolumeValue">78%</strong>
+          </label>
+          <input id="masterVolumeSlider" class="setting-range" type="range" min="0" max="100" step="1" value="78" />
+          <label class="setting-row" for="bgmVolumeSlider">
+            <span>BGM</span>
+            <strong id="bgmVolumeValue">68%</strong>
+          </label>
+          <input id="bgmVolumeSlider" class="setting-range" type="range" min="0" max="100" step="1" value="68" />
+          <label class="setting-row" for="sfxVolumeSlider">
+            <span>SFX</span>
+            <strong id="sfxVolumeValue">92%</strong>
+          </label>
+          <input id="sfxVolumeSlider" class="setting-range" type="range" min="0" max="100" step="1" value="92" />
+          <label class="setting-row" for="voiceVolumeSlider">
+            <span>VOICE</span>
+            <strong id="voiceVolumeValue">88%</strong>
+          </label>
+          <input id="voiceVolumeSlider" class="setting-range" type="range" min="0" max="100" step="1" value="88" />
+          <div class="settings-actions">
+            <button id="settingsMuteBtn" class="setting-btn">MUTE OFF</button>
+            <button id="settingsTrackBtn" class="setting-btn">NEXT TRACK</button>
+            <button id="settingsTestBtn" class="setting-btn">TEST MIX</button>
+            <button id="settingsCalibrateBtn" class="setting-btn">CALIBRATE</button>
+            <button id="settingsLowStimAudioBtn" class="setting-btn">LOW STIM OFF</button>
+          </div>
+          <div class="settings-actions preset-actions">
+            <button class="setting-btn preset-btn" data-preset="arcade">ARCADE</button>
+            <button class="setting-btn preset-btn" data-preset="focus">FOCUS</button>
+            <button class="setting-btn preset-btn" data-preset="cinematic">CINEMATIC</button>
+            <button class="setting-btn preset-btn" data-preset="quiet">QUIET</button>
+          </div>
+          <div class="settings-meta-grid">
+            <div class="settings-meta">
+              <span class="meta-label">BGM STATE</span>
+              <strong id="bgmStateValue">NORMAL</strong>
+            </div>
+            <div class="settings-meta">
+              <span class="meta-label">CURRENT TRACK</span>
+              <strong id="trackNameValue">-</strong>
+            </div>
+            <div class="settings-meta">
+              <span class="meta-label">MUSIC DRIVE</span>
+              <strong id="musicDriveValue">CALM</strong>
+            </div>
+            <div class="settings-meta">
+              <span class="meta-label">BOSS LAYER</span>
+              <strong id="bossLayerValue">OFF</strong>
+            </div>
+          </div>
+        </section>
+        <section class="settings-group">
+          <h3>CONTROL</h3>
+          <label class="setting-row" for="inputBufferSlider">
+            <span>INPUT PRESET</span>
+            <strong id="inputProfileValue">STANDARD</strong>
+          </label>
+          <div class="settings-actions preset-actions control-preset-actions">
+            <button class="setting-btn control-preset-btn" data-input-preset="standard">STANDARD</button>
+            <button class="setting-btn control-preset-btn" data-input-preset="arcade">ARCADE</button>
+            <button class="setting-btn control-preset-btn" data-input-preset="control">CONTROL</button>
+            <button class="setting-btn control-preset-btn" data-input-preset="mobileSafe">MOBILE SAFE</button>
+          </div>
+          <div class="keybind-grid" id="keybindGrid">
+            <div class="keybind-row">
+              <span class="keybind-label">MOVE LEFT</span>
+              <strong id="rebindMoveLeftValue">ArrowLeft</strong>
+              <button id="rebindMoveLeftBtn" class="setting-btn keybind-btn" data-rebind-action="moveLeft">REBIND</button>
+            </div>
+            <div class="keybind-row">
+              <span class="keybind-label">MOVE RIGHT</span>
+              <strong id="rebindMoveRightValue">ArrowRight</strong>
+              <button id="rebindMoveRightBtn" class="setting-btn keybind-btn" data-rebind-action="moveRight">REBIND</button>
+            </div>
+            <div class="keybind-row">
+              <span class="keybind-label">ROTATE CW</span>
+              <strong id="rebindRotateCWValue">ArrowUp / KeyX</strong>
+              <button id="rebindRotateCWBtn" class="setting-btn keybind-btn" data-rebind-action="rotateCW">REBIND</button>
+            </div>
+            <div class="keybind-row">
+              <span class="keybind-label">ROTATE CCW</span>
+              <strong id="rebindRotateCCWValue">KeyZ</strong>
+              <button id="rebindRotateCCWBtn" class="setting-btn keybind-btn" data-rebind-action="rotateCCW">REBIND</button>
+            </div>
+            <div class="keybind-row">
+              <span class="keybind-label">SOFT DROP</span>
+              <strong id="rebindSoftDropValue">ArrowDown</strong>
+              <button id="rebindSoftDropBtn" class="setting-btn keybind-btn" data-rebind-action="softDrop">REBIND</button>
+            </div>
+            <div class="keybind-row">
+              <span class="keybind-label">HARD DROP</span>
+              <strong id="rebindHardDropValue">Space</strong>
+              <button id="rebindHardDropBtn" class="setting-btn keybind-btn" data-rebind-action="hardDrop">REBIND</button>
+            </div>
+            <div class="keybind-row">
+              <span class="keybind-label">HOLD</span>
+              <strong id="rebindHoldValue">KeyC</strong>
+              <button id="rebindHoldBtn" class="setting-btn keybind-btn" data-rebind-action="hold">REBIND</button>
+            </div>
+            <div class="keybind-row">
+              <span class="keybind-label">PAUSE</span>
+              <strong id="rebindPauseValue">Escape / KeyP</strong>
+              <button id="rebindPauseBtn" class="setting-btn keybind-btn" data-rebind-action="pause">REBIND</button>
+            </div>
+          </div>
+          <label class="setting-row" for="inputBufferSlider">
+            <span>BUFFER</span>
+            <strong id="inputBufferValue">110ms</strong>
+          </label>
+          <input id="inputBufferSlider" class="setting-range" type="range" min="50" max="150" step="5" value="110" />
+          <div class="settings-actions">
+            <button id="controlAdvancedBtn" class="setting-btn">ADVANCED OFF</button>
+          </div>
+          <div id="controlAdvancedPanel" class="control-advanced-panel hidden">
+            <label class="setting-row" for="dasSlider">
+              <span>DAS</span>
+              <strong id="dasValue">135ms</strong>
+            </label>
+            <input id="dasSlider" class="setting-range" type="range" min="60" max="200" step="5" value="135" />
+            <label class="setting-row" for="arrSlider">
+              <span>ARR</span>
+              <strong id="arrValue">40ms</strong>
+            </label>
+            <input id="arrSlider" class="setting-range" type="range" min="0" max="80" step="4" value="40" />
+            <label class="setting-row" for="softDropRepeatSlider">
+              <span>SOFT DROP REPEAT</span>
+              <strong id="softDropRepeatValue">32ms</strong>
+            </label>
+            <input id="softDropRepeatSlider" class="setting-range" type="range" min="12" max="60" step="4" value="32" />
+            <label class="setting-row" for="lockResetLimitSlider">
+              <span>LOCK RESET LIMIT</span>
+              <strong id="lockResetLimitValue">15</strong>
+            </label>
+            <input id="lockResetLimitSlider" class="setting-range" type="range" min="4" max="20" step="1" value="15" />
+            <div class="settings-actions">
+              <button id="irsToggleBtn" class="setting-btn">IRS ON</button>
+              <button id="ihsToggleBtn" class="setting-btn">IHS ON</button>
+              <button id="hardDropBufferBtn" class="setting-btn">HARD DROP BUFFER ON</button>
+            </div>
+          </div>
+          <p class="settings-note">
+            기본은 쉬운 프리셋으로 두고, 고급 입력 설정을 열면 DAS/ARR/버퍼/IRS/IHS를 조정할 수 있습니다. 재바인딩 중에는 다음 키 입력이 즉시 해당 액션으로 저장됩니다.
+          </p>
+        </section>
+        <section class="settings-group">
+          <h3>DISPLAY</h3>
+          <label class="setting-row" for="shakeSlider">
+            <span>SCREEN SHAKE</span>
+            <strong id="shakeValue">100%</strong>
+          </label>
+          <input id="shakeSlider" class="setting-range" type="range" min="0" max="100" step="5" value="100" />
+          <div class="settings-actions">
+            <button id="settingsReducedFxBtn" class="setting-btn">FX FULL</button>
+            <button id="settingsLowPowerBtn" class="setting-btn">LOW POWER OFF</button>
+            <button id="settingsBriefingBtn" class="setting-btn">REPLAY BRIEFING</button>
+          </div>
+          <div class="settings-actions">
+            <button id="settingsDevPanelBtn" class="setting-btn">DEV PANEL OFF</button>
+            <button id="settingsExportSessionBtn" class="setting-btn">EXPORT SESSION</button>
+            <button id="settingsClearSessionBtn" class="setting-btn">CLEAR SESSION</button>
+          </div>
+          <p class="settings-note">
+            화면 흔들림과 임팩트 강도를 조절합니다. 저자극 FX는 배경/콜아웃 강도를 줄이고, 저사양 모드는 배경 밀도와 흔들림을 더 낮춥니다. DEV PANEL은 FPS, 입력, 오디오, 보스 상태와 마지막 오류를 숨김 카드로 표시합니다.
+          </p>
+        </section>
+        <section class="settings-group">
+          <h3>MOBILE</h3>
+          <label class="setting-row" for="mobileScaleSlider">
+            <span>BUTTON SIZE</span>
+            <strong id="mobileScaleValue">100%</strong>
+          </label>
+          <input id="mobileScaleSlider" class="setting-range" type="range" min="90" max="130" step="5" value="100" />
+          <label class="setting-row" for="touchRepeatSlider">
+            <span>REPEAT SPEED</span>
+            <strong id="touchRepeatValue">75ms</strong>
+          </label>
+          <input id="touchRepeatSlider" class="setting-range" type="range" min="45" max="120" step="5" value="75" />
+          <div class="settings-actions">
+            <button class="setting-btn layout-btn" data-layout="default">DEFAULT</button>
+            <button class="setting-btn layout-btn" data-layout="lefty">LEFTY</button>
+            <button class="setting-btn layout-btn" data-layout="righty">RIGHTY</button>
+            <button class="setting-btn layout-btn" data-layout="compact">COMPACT</button>
+          </div>
+          <div class="settings-actions">
+            <button id="settingsHapticLevelBtn" class="setting-btn">HAPTIC NORMAL</button>
+            <button id="settingsTouchDebugBtn" class="setting-btn">DEBUG OFF</button>
+          </div>
+          <p class="settings-note">
+            모바일에서는 버튼 위치, 크기, 반복 속도, 햅틱 강도를 조절할 수 있습니다. 세로 모드에서는 회전 힌트를 따르고, 터치 디버그는 마지막 입력과 반복 횟수를 표시합니다.
+          </p>
+        </section>
+      </div>
+    </div>
+  </section>
+
+  <section id="briefingOverlay" class="modal-overlay briefing-overlay" aria-hidden="true">
+    <div class="modal-card briefing-modal" role="dialog" aria-modal="true" aria-labelledby="briefingTitle">
+      <p class="modal-eyebrow">FIELD GUIDE</p>
+      <div class="briefing-progress">
+        <span id="briefingStepValue">1 / 4</span>
+        <div id="briefingDots" class="briefing-dots" aria-hidden="true"></div>
+      </div>
+      <h2 id="briefingTitle">BOARD CONTROL</h2>
+      <p id="briefingText" class="briefing-text">보드의 핵심 정보와 기본 흐름을 먼저 파악합니다.</p>
+      <div id="briefingHighlights" class="briefing-highlights"></div>
+      <div class="result-actions">
+        <button id="briefingSkipBtn" class="setting-btn">SKIP</button>
+        <button id="briefingNextBtn" class="setting-btn">NEXT</button>
+      </div>
+    </div>
+  </section>
+
+  <section id="resultOverlay" class="modal-overlay result-overlay" aria-hidden="true">
+    <div class="modal-card result-modal" role="dialog" aria-modal="true" aria-labelledby="resultTitle">
+      <p class="modal-eyebrow" id="resultEyebrow">BATTLE RESULT</p>
+      <h2 id="resultTitle">VICTORY</h2>
+      <p id="resultSummary" class="result-summary">전투 결과를 집계 중입니다.</p>
+      <div id="resultFeedbackList" class="result-feedback-list" aria-live="polite"></div>
+      <div class="result-stats-grid">
+        <div class="result-stat">
+          <span class="meta-label">SCORE</span>
+          <strong id="resultScore">0</strong>
+        </div>
+        <div class="result-stat">
+          <span class="meta-label">LINES</span>
+          <strong id="resultLines">0</strong>
+        </div>
+        <div class="result-stat">
+          <span class="meta-label">MAX COMBO</span>
+          <strong id="resultMaxCombo">x0</strong>
+        </div>
+        <div class="result-stat">
+          <span class="meta-label">T-SPIN</span>
+          <strong id="resultTSpins">0</strong>
+        </div>
+        <div class="result-stat">
+          <span class="meta-label">TETRIS</span>
+          <strong id="resultTetrises">0</strong>
+        </div>
+        <div class="result-stat">
+          <span class="meta-label">PERFECT</span>
+          <strong id="resultPerfects">0</strong>
+        </div>
+      </div>
+      <div class="result-actions">
+        <button id="resultRestartBtn" class="pause-btn">PLAY AGAIN</button>
+        <button id="resultBriefingBtn" class="pause-btn">BRIEFING</button>
+        <button id="resultTitleBtn" class="pause-btn">TITLE</button>
+      </div>
+    </div>
+  </section>
+
+  <section id="rotateHint" class="rotate-hint hidden" aria-live="polite">
+    <strong>LANDSCAPE RECOMMENDED</strong>
+    <span>세로 화면에서는 조작 영역이 좁습니다. 기기를 가로로 돌리면 훨씬 안정적으로 플레이할 수 있습니다.</span>
+  </section>
+
+  <!-- 콤보 디스플레이 -->
+  <div id="comboDisplay" class="combo-display">
+    <span id="comboText">x12</span>
+  </div>
+
+  <div id="battleCallout" class="battle-callout" aria-live="polite">
+    <span id="battleCalloutTitle">DOUBLE</span>
+    <small id="battleCalloutSubtitle">BACK TO BACK</small>
+  </div>
+
+  <div id="devDebugPanel" class="touch-debug-panel hidden" aria-live="polite">
+    <span class="meta-label">DEV PANEL</span>
+    <strong id="touchDebugAction">IDLE</strong>
+    <span id="touchDebugMeta">press:0 · repeat:0 · last:0ms</span>
+    <span id="devFpsMeta">fps:0 · avg:0 · min:0</span>
+    <span id="devAudioMeta">audio:idle · bgm:normal · track:-</span>
+    <span id="devGameMeta">boss:0 · incoming:0 · paused:false</span>
+    <span id="devErrorMeta">error:none</span>
+  </div>
+
+  <!-- 메인 스크립트 -->
+  <script type="module" src="./src/main.js"></script>
+</body>
+</html>
