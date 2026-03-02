@@ -108,24 +108,33 @@ const CANVAS_BASE_SIZES = {
 };
 
 /**
- * 현재 환경에 따른 셀 크기 계산
+ * [v3.17.0] 높이 우선(Height-First) 셀 크기 계산
+ * 모바일에서 가용 높이를 기준으로 셀 크기 계산
  * @returns {number} 셀 크기 (px)
  */
 function getCellSizeForEnvironment() {
   const isMobile = window.matchMedia('(max-width: 768px)').matches;
-  const isPortrait = window.matchMedia('(orientation: portrait)').matches;
-  const containerWidth = document.querySelector('.lane.player-lane')?.clientWidth || window.innerWidth;
   
   if (isMobile) {
-    // 모바일: 화면 너비 기준으로 셀 크기 계산
-    // 여유 공간을 남기기 위해 약간의 마진 고려
-    const availableWidth = isPortrait 
-      ? containerWidth * 0.4  // 세로: 플레이어 보드 영역
-      : containerWidth * 0.35; // 가로: 더 작은 공간
+    // 모바일: 높이 우선 계산
+    const vh = window.innerHeight;
+    const vw = window.innerWidth;
+    const isPortrait = window.matchMedia('(orientation: portrait)').matches;
     
-    // 10열 기준, 최소 16px ~ 최대 24px
-    const cellSize = Math.floor(availableWidth / 10);
-    return Math.max(16, Math.min(24, cellSize));
+    // 상단바(50px) + 상태바(40px) + 컨트롤(150px) + 여백(40px) 제외
+    const availableHeight = vh - 280;
+    // 좌우 여백 고려한 가용 너비
+    const availableWidth = vw * (isPortrait ? 0.85 : 0.4);
+    
+    // 20행(보드) + 2행(여유) 기준 높이, 10열 기준 너비
+    const cellSizeByHeight = Math.floor(availableHeight / 22);
+    const cellSizeByWidth = Math.floor(availableWidth / 10);
+    
+    // 둘 중 작은 값 선택 (화면에 맞는 크기)
+    const cellSize = Math.min(cellSizeByHeight, cellSizeByWidth);
+    
+    // 최소 14px, 최대 22px 제한
+    return Math.max(14, Math.min(22, cellSize));
   }
   
   // 데스크톱: 기본 30px

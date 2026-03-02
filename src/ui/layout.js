@@ -1,5 +1,5 @@
-// [v3.15.2] 모바일 뷰포트 동적 계산 및 레이아웃 개선
-// 변경사항: 동적 높이 계산, 방향 전환 대응, Visual Viewport API 지원
+// [v3.17.0] PiP 스타일 모바일 뷰포트 계산
+// 변경사항: 높이 우선 계산, PiP 레이아웃 대응, 인체공학적 컨트롤 높이 반영
 
 /**
  * 디바운스 유틸리티 함수
@@ -16,8 +16,8 @@ function debounce(fn, delay) {
 }
 
 /**
- * 실제 가용 뷰포트 높이를 계산하여 CSS 변수로 설정
- * Android 주소창/네비게이션 바 높이 변화에 대응
+ * [v3.17.0] 실제 가용 뷰포트 높이 계산
+ * PiP 레이아웃과 인체공학적 컨트롤 높이를 고려
  */
 export function updateViewportHeight() {
   // Visual Viewport API 사용 (가상 키보드 대응)
@@ -28,16 +28,37 @@ export function updateViewportHeight() {
   // 동적 뷰포트 높이 변수 설정 (--real-vh)
   doc.style.setProperty('--real-vh', `${vh}px`);
 
-  // 사용 가능한 콘텐츠 높이 계산 (상단바, 컨트롤, safe-area 고려)
+  // 사용 가능한 콘텐츠 높이 계산
   const isPortrait = window.matchMedia('(orientation: portrait)').matches;
-  const topbarHeight = isPortrait ? 50 : 36;
-  const statusbarHeight = isPortrait ? 44 : 0;
-  const controlsHeight = isPortrait ? 148 : 72;
+  const isMobile = window.matchMedia('(max-width: 768px)').matches;
+  
+  let topbarHeight, statusbarHeight, controlsHeight;
+  
+  if (isMobile && isPortrait) {
+    // [v3.17.0] 모바일 세로: PiP 레이아웃 기준
+    topbarHeight = 50;
+    statusbarHeight = 40;
+    controlsHeight = 160; // 인체공학적 컨트롤 높이 증가
+  } else if (isMobile) {
+    // 모바일 가로
+    topbarHeight = 36;
+    statusbarHeight = 30;
+    controlsHeight = 80;
+  } else {
+    // 데스크톱
+    topbarHeight = 50;
+    statusbarHeight = 0;
+    controlsHeight = 0;
+  }
+  
   const safeTop = parseFloat(getComputedStyle(doc).getPropertyValue('--safe-top')) || 0;
   const safeBottom = parseFloat(getComputedStyle(doc).getPropertyValue('--safe-bottom')) || 0;
 
-  const availableHeight = height - topbarHeight - statusbarHeight - controlsHeight - safeTop - safeBottom - 20;
-  doc.style.setProperty('--available-height', `${Math.max(availableHeight, 200)}px`);
+  const availableHeight = height - topbarHeight - statusbarHeight - controlsHeight - safeTop - safeBottom - 16;
+  doc.style.setProperty('--available-height', `${Math.max(availableHeight, 180)}px`);
+  
+  // PiP 레이아웃을 위한 방향 속성 저장
+  doc.setAttribute('data-orientation', isPortrait ? 'portrait' : 'landscape');
 }
 
 /**
