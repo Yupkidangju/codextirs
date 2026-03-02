@@ -1727,11 +1727,10 @@ body.neon-shift-active .recent-battle-card {
   }
 
   .board-wrap canvas {
-    width: auto;
-    height: auto;
+    /* [v3.16.1] JS에서 동적으로 설정한 크기 사용 (auto 제거) */
+    /* width/height는 main.js의 resizeCanvas()에서 설정 */
     max-width: 100%;
-    /* 동적 가용 높이 사용 (JS에서 계산된 --available-height) */
-    max-height: min(100%, calc(var(--available-height) * 0.55));
+    max-height: 100%;
     aspect-ratio: 1 / 2;
     object-fit: contain;
   }
