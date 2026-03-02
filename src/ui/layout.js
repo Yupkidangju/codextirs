@@ -1,5 +1,5 @@
-// [v3.17.0] PiP 스타일 모바일 뷰포트 계산
-// 변경사항: 높이 우선 계산, PiP 레이아웃 대응, 인체공학적 컨트롤 높이 반영
+// [v3.17.0] 컨테이너 주도형 모바일 뷰포트 계산
+// 변경사항: 창 크기 기반 보드 계산 제거, 실제 뷰포트 높이와 방향 메타만 유지
 
 /**
  * 디바운스 유틸리티 함수
@@ -16,48 +16,18 @@ function debounce(fn, delay) {
 }
 
 /**
- * [v3.17.0] 실제 가용 뷰포트 높이 계산
- * PiP 레이아웃과 인체공학적 컨트롤 높이를 고려
+ * [v3.17.0] 실제 뷰포트 높이 계산
+ * 모바일은 CSS가 레이아웃 공간을 할당하고, JS는 동적 뷰포트 높이와 방향 메타만 갱신한다.
  */
 export function updateViewportHeight() {
-  // Visual Viewport API 사용 (가상 키보드 대응)
   const height = window.visualViewport?.height || window.innerHeight;
   const vh = height * 0.01;
   const doc = document.documentElement;
 
-  // 동적 뷰포트 높이 변수 설정 (--real-vh)
   doc.style.setProperty('--real-vh', `${vh}px`);
+  doc.style.setProperty('--app-height', `${height}px`);
 
-  // 사용 가능한 콘텐츠 높이 계산
   const isPortrait = window.matchMedia('(orientation: portrait)').matches;
-  const isMobile = window.matchMedia('(max-width: 768px)').matches;
-  
-  let topbarHeight, statusbarHeight, controlsHeight;
-  
-  if (isMobile && isPortrait) {
-    // [v3.17.0] 모바일 세로: PiP 레이아웃 기준
-    topbarHeight = 50;
-    statusbarHeight = 40;
-    controlsHeight = 160; // 인체공학적 컨트롤 높이 증가
-  } else if (isMobile) {
-    // 모바일 가로
-    topbarHeight = 36;
-    statusbarHeight = 30;
-    controlsHeight = 80;
-  } else {
-    // 데스크톱
-    topbarHeight = 50;
-    statusbarHeight = 0;
-    controlsHeight = 0;
-  }
-  
-  const safeTop = parseFloat(getComputedStyle(doc).getPropertyValue('--safe-top')) || 0;
-  const safeBottom = parseFloat(getComputedStyle(doc).getPropertyValue('--safe-bottom')) || 0;
-
-  const availableHeight = height - topbarHeight - statusbarHeight - controlsHeight - safeTop - safeBottom - 16;
-  doc.style.setProperty('--available-height', `${Math.max(availableHeight, 180)}px`);
-  
-  // PiP 레이아웃을 위한 방향 속성 저장
   doc.setAttribute('data-orientation', isPortrait ? 'portrait' : 'landscape');
 }
 
@@ -66,7 +36,7 @@ export function updateViewportHeight() {
  * @returns {boolean} 모바일 여부
  */
 export function detectMobile() {
-  return window.matchMedia("(max-width: 960px)").matches;
+  return window.matchMedia("(max-width: 768px)").matches;
 }
 
 /**
@@ -97,29 +67,23 @@ export function applyLayout() {
  * 이벤트 리스너 등록 및 초기 계산 수행
  */
 export function initMobileLayout() {
-  // 초기 뷰포트 높이 계산
+  const syncLayout = debounce(() => {
+    applyLayout();
+  }, 60);
+
   updateViewportHeight();
 
-  // 리사이즈 이벤트에 디바운스 적용
-  window.addEventListener('resize', debounce(updateViewportHeight, 100));
-
-  // 방향 전환 이벤트 (Android 딜레이 대응)
   window.addEventListener('orientationchange', () => {
-    // [v3.15.2] 방향 전환 시 뷰포트 높이 재계산 및 캔버스 크기 조정
     setTimeout(() => {
-      updateViewportHeight();
-      // 캔버스 크기 재조정 트리거 (게임 렌더링에 사용)
-      document.documentElement.setAttribute('data-orientation', 
-        window.matchMedia('(orientation: portrait)').matches ? 'portrait' : 'landscape'
-      );
+      applyLayout();
     }, 300);
   });
 
-  // Visual Viewport API 지원 시 이벤트 등록 (가상 키보드 대응)
+  window.addEventListener('resize', syncLayout);
+
   if (window.visualViewport) {
-    window.visualViewport.addEventListener('resize', debounce(updateViewportHeight, 50));
+    window.visualViewport.addEventListener('resize', syncLayout);
   }
 
-  // 레이아웃 초기 적용
   applyLayout();
 }

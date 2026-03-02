@@ -1,5 +1,5 @@
 ﻿/*
- * [v3.15.1] 메인 엔트리 포인트
+ * [v3.17.0] 메인 엔트리 포인트
  * 
  * 작성일: 2026-03-01
  * 변경사항: 
@@ -21,6 +21,7 @@
  *   - [v3.14.2] 아이템 글로우 예외 및 자동 고정 체감 수정 반영
  *   - [v3.15.0] 전투 콜아웃 중복 억제와 STATUS/INCOMING 압축 렌더링 추가
  *   - [v3.15.1] 모바일 보드 축소/버튼 확대 기준 보정
+ *   - [v3.17.0] 모바일 보드 컨테이너 기반 리사이징과 ResizeObserver 동기화
  */
 
 import { createGame } from "./game/core/engine.js";
@@ -99,7 +100,7 @@ const sfxVolumeValue = document.getElementById("sfxVolumeValue");
 const voiceVolumeSlider = document.getElementById("voiceVolumeSlider");
 const voiceVolumeValue = document.getElementById("voiceVolumeValue");
 
-// [v3.16.0] 캔버스 동적 해상도 관리
+// [v3.17.0] 캔버스 동적 해상도 관리
 const CANVAS_BASE_SIZES = {
   board: { cols: 10, rows: 20 },
   miniBoard: { cols: 10, rows: 20 },
@@ -107,38 +108,47 @@ const CANVAS_BASE_SIZES = {
   next: { cols: 4, rows: 3 }
 };
 
+let canvasResizeTimeout = null;
+let mobileBoardResizeObserver = null;
+let observedMobileBoardWrap = null;
+
+function isMobileCanvasLayout() {
+  return window.matchMedia("(max-width: 768px)").matches;
+}
+
+function getPlayerBoardWrap() {
+  return document.querySelector(".lane.player-lane .board-wrap");
+}
+
 /**
- * [v3.17.0] 높이 우선(Height-First) 셀 크기 계산
- * 모바일에서 가용 높이를 기준으로 셀 크기 계산
- * @returns {number} 셀 크기 (px)
+ * [v3.17.0] 캔버스 셀 크기 계산
+ * 모바일은 CSS가 배정한 플레이어 보드 컨테이너 크기를 읽고, 데스크톱은 기존 고정 크기를 유지한다.
+ * @returns {{cellSize:number, miniCellSize:number, previewCellSize:number}} 캔버스 크기 정보
  */
-function getCellSizeForEnvironment() {
-  const isMobile = window.matchMedia('(max-width: 768px)').matches;
-  
-  if (isMobile) {
-    // 모바일: 높이 우선 계산
-    const vh = window.innerHeight;
-    const vw = window.innerWidth;
-    const isPortrait = window.matchMedia('(orientation: portrait)').matches;
-    
-    // 상단바(50px) + 상태바(40px) + 컨트롤(150px) + 여백(40px) 제외
-    const availableHeight = vh - 280;
-    // 좌우 여백 고려한 가용 너비
-    const availableWidth = vw * (isPortrait ? 0.85 : 0.4);
-    
-    // 20행(보드) + 2행(여유) 기준 높이, 10열 기준 너비
-    const cellSizeByHeight = Math.floor(availableHeight / 22);
-    const cellSizeByWidth = Math.floor(availableWidth / 10);
-    
-    // 둘 중 작은 값 선택 (화면에 맞는 크기)
-    const cellSize = Math.min(cellSizeByHeight, cellSizeByWidth);
-    
-    // 최소 14px, 최대 22px 제한
-    return Math.max(14, Math.min(22, cellSize));
+function getCanvasScaleMetrics() {
+  if (isMobileCanvasLayout()) {
+    const boardWrap = getPlayerBoardWrap();
+    const wrapHeight = boardWrap?.clientHeight || 0;
+    const wrapWidth = boardWrap?.clientWidth || 0;
+    const sizeFromHeight = Math.floor(wrapHeight / CANVAS_BASE_SIZES.board.rows);
+    const sizeFromWidth = Math.floor(wrapWidth / CANVAS_BASE_SIZES.board.cols);
+    const resolvedCellSize = Math.min(
+      sizeFromHeight || Number.POSITIVE_INFINITY,
+      sizeFromWidth || Number.POSITIVE_INFINITY,
+    );
+    const cellSize = Math.max(12, Number.isFinite(resolvedCellSize) ? resolvedCellSize : 18);
+    return {
+      cellSize,
+      miniCellSize: Math.max(4, Math.floor(cellSize * 0.4)),
+      previewCellSize: Math.max(16, Math.min(22, cellSize)),
+    };
   }
-  
-  // 데스크톱: 기본 30px
-  return 30;
+
+  return {
+    cellSize: 30,
+    miniCellSize: 21,
+    previewCellSize: 30,
+  };
 }
 
 /**
@@ -180,39 +190,53 @@ function resizeCanvas(canvas, cols, rows, cellSize) {
  * 게임 캔버스 초기화 (모든 캔버스 크기 설정)
  */
 function setupCanvases() {
-  const cellSize = getCellSizeForEnvironment();
-  const miniCellSize = Math.floor(cellSize * 0.7); // AI 보드는 70% 크기
+  const { cellSize, miniCellSize, previewCellSize } = getCanvasScaleMetrics();
   
-  // 메인 보드
   resizeCanvas(playerCanvas, CANVAS_BASE_SIZES.board.cols, CANVAS_BASE_SIZES.board.rows, cellSize);
   resizeCanvas(aiCanvas, CANVAS_BASE_SIZES.miniBoard.cols, CANVAS_BASE_SIZES.miniBoard.rows, miniCellSize);
   
-  // Hold 미리보기
-  resizeCanvas(holdCanvas, CANVAS_BASE_SIZES.hold.cols, CANVAS_BASE_SIZES.hold.rows, cellSize);
+  resizeCanvas(holdCanvas, CANVAS_BASE_SIZES.hold.cols, CANVAS_BASE_SIZES.hold.rows, previewCellSize);
   
-  // Next 미리보기들
   [next1Canvas, next2Canvas, next3Canvas, next4Canvas, next5Canvas].forEach(canvas => {
-    resizeCanvas(canvas, CANVAS_BASE_SIZES.next.cols, CANVAS_BASE_SIZES.next.rows, cellSize);
+    resizeCanvas(canvas, CANVAS_BASE_SIZES.next.cols, CANVAS_BASE_SIZES.next.rows, previewCellSize);
   });
   
-  console.log(`[v3.16.0] 캔버스 초기화 완료: 셀 크기 ${cellSize}px`);
+  console.log(`[v3.17.0] 캔버스 초기화 완료: 셀 크기 ${cellSize}px`);
 }
 
 /**
  * 화면 크기 변경 시 캔버스 재조정
  */
 function handleCanvasResize() {
-  // 디바운스 처리를 위해 타임아웃 사용
-  if (window.canvasResizeTimeout) {
-    clearTimeout(window.canvasResizeTimeout);
+  if (canvasResizeTimeout) {
+    clearTimeout(canvasResizeTimeout);
   }
-  window.canvasResizeTimeout = setTimeout(() => {
+  canvasResizeTimeout = setTimeout(() => {
     setupCanvases();
-    // 게임이 실행 중이면 화면 갱신
     if (game && typeof game.requestRender === 'function') {
       game.requestRender();
     }
   }, 250);
+}
+
+function syncMobileCanvasObserver() {
+  const nextBoardWrap = isMobileCanvasLayout() ? getPlayerBoardWrap() : null;
+
+  if (mobileBoardResizeObserver && observedMobileBoardWrap !== nextBoardWrap) {
+    mobileBoardResizeObserver.disconnect();
+    mobileBoardResizeObserver = null;
+    observedMobileBoardWrap = null;
+  }
+
+  if (!nextBoardWrap || typeof ResizeObserver !== "function" || mobileBoardResizeObserver) {
+    return;
+  }
+
+  observedMobileBoardWrap = nextBoardWrap;
+  mobileBoardResizeObserver = new ResizeObserver(() => {
+    handleCanvasResize();
+  });
+  mobileBoardResizeObserver.observe(nextBoardWrap);
 }
 const settingsMuteBtn = document.getElementById("settingsMuteBtn");
 const settingsTrackBtn = document.getElementById("settingsTrackBtn");
@@ -1054,7 +1078,7 @@ function recordRuntimeError(source, error) {
 
 function exportSessionDiagnostics() {
   const snapshot = {
-    buildVersion: "3.15.1",
+    buildVersion: "3.17.0",
     deviceMeta: getDeviceMeta(),
     uiSettings,
     sessionDiagnostics,
@@ -2509,14 +2533,19 @@ installTouch(dispatch, {
     game?.setHeldAction?.("player", action, isDown);
   },
 });
-// [v3.15.2] 모바일 레이아웃 초기화 (동적 뷰포트 계산 포함)
+// [v3.17.0] 모바일 레이아웃 초기화 (컨테이너 기준 캔버스 리사이징 포함)
 initMobileLayout();
+syncMobileCanvasObserver();
 renderMissionChecklist();
 syncTouchDebugPanel();
 syncRotateHint();
 
 window.addEventListener("resize", () => {
   applyLayout();
+  syncMobileCanvasObserver();
+  if (!isMobileCanvasLayout() || typeof ResizeObserver !== "function") {
+    handleCanvasResize();
+  }
   bgFx.resize();
   syncRotateHint();
   syncTouchDebugPanel();
@@ -3012,11 +3041,8 @@ function loop(now) {
   requestAnimationFrame(loop);
 }
 
-// [v3.16.0] 캔버스 초기화 및 리사이즈 이벤트 설정
+// [v3.17.0] 캔버스 초기화 및 모바일 컨테이너 관찰 설정
 setupCanvases();
-window.addEventListener('resize', handleCanvasResize);
-window.addEventListener('orientationchange', () => {
-  setTimeout(handleCanvasResize, 300);
-});
+syncMobileCanvasObserver();
 
 requestAnimationFrame(loop);
