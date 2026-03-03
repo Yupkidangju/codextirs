@@ -412,7 +412,7 @@ body.mobile-shell #stage.stage {
   flex: 1 1 auto;
   min-height: 0;
   display: grid;
-  justify-items: center;
+  justify-items: start;
   align-content: start;
   gap: 8px;
   padding:
@@ -443,7 +443,7 @@ body.mobile-shell .lane.player-lane {
   width: 100%;
   max-width: 258px;
   min-height: min(44vh, 420px);
-  margin-left: 6px;
+  margin-left: 12px;
 }
 
 body.mobile-shell .board-wrap {
@@ -453,7 +453,7 @@ body.mobile-shell .board-wrap {
 }
 
 body.mobile-shell .lane.player-lane .board-wrap {
-  margin-left: 40px;
+  margin-left: 38px;
   width: min(50.5vw, 198px);
   aspect-ratio: 1 / 2;
   max-height: min(44vh, 420px);
