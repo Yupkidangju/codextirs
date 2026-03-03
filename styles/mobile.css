@@ -440,11 +440,12 @@ body.mobile-shell .mobile-settings-control {
 
 body.mobile-shell .lane.player-lane {
   width: 100%;
-  max-width: 236px;
+  max-width: 252px;
   display: grid;
-  gap: 6px;
-  justify-items: start;
-  transform: translateX(-10%);
+  grid-template-columns: 54px minmax(0, 1fr);
+  grid-template-areas: "side board";
+  gap: 8px;
+  justify-items: stretch;
 }
 
 body.mobile-shell .board-wrap {
@@ -454,9 +455,10 @@ body.mobile-shell .board-wrap {
 }
 
 body.mobile-shell .lane.player-lane .board-wrap {
-  width: min(43vw, 172px);
+  grid-area: board;
+  width: min(47vw, 188px);
   aspect-ratio: 1 / 2;
-  max-height: min(35vh, 344px);
+  max-height: min(39vh, 376px);
   padding: 8px;
   border-radius: 18px;
   background: linear-gradient(180deg, rgba(5, 12, 22, 0.96) 0%, rgba(10, 18, 34, 0.9) 100%);
@@ -476,7 +478,8 @@ body.mobile-shell .lane.ai-lane canvas {
 }
 
 body.mobile-shell .player-side {
-  width: 58px;
+  grid-area: side;
+  width: 54px;
   display: grid;
   grid-template-columns: 1fr;
   gap: 6px;
@@ -494,16 +497,19 @@ body.mobile-shell .hold-preview {
 body.mobile-shell .next-preview {
   display: grid;
   grid-template-columns: 1fr;
-  gap: 4px;
+  gap: 5px;
+  justify-items: center;
 }
 
 body.mobile-shell .next-preview .label {
   grid-column: auto;
+  justify-self: stretch;
+  text-align: center;
 }
 
 body.mobile-shell .next-preview canvas {
-  width: 40px !important;
-  height: 26px !important;
+  width: 42px !important;
+  height: 24px !important;
 }
 
 body.mobile-shell .next-preview .extra-next {
