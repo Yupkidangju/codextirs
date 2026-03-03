@@ -1,5 +1,5 @@
-// [v3.17.1] 컨테이너 주도형 모바일 뷰포트 계산
-// 변경사항: stage.mobile/body.mobile-layout 강제 오버라이드와 모바일 판정 보정
+// [v3.18.0] 컨테이너 주도형 모바일 뷰포트 계산
+// 변경사항: mobile.html 전용 셸을 감지해 항상 모바일 경로를 타도록 보정
 
 /**
  * 디바운스 유틸리티 함수
@@ -16,7 +16,7 @@ function debounce(fn, delay) {
 }
 
 /**
- * [v3.17.1] 실제 뷰포트 높이 계산
+ * [v3.18.0] 실제 뷰포트 높이 계산
  * 모바일은 CSS가 레이아웃 공간을 할당하고, JS는 동적 뷰포트 높이와 방향 메타만 갱신한다.
  */
 export function updateViewportHeight() {
@@ -36,6 +36,9 @@ export function updateViewportHeight() {
  * @returns {boolean} 모바일 여부
  */
 export function detectMobile() {
+  if (document.body?.classList.contains("mobile-shell")) {
+    return true;
+  }
   return window.matchMedia("(max-width: 960px), ((max-height: 600px) and (pointer: coarse))").matches;
 }
 

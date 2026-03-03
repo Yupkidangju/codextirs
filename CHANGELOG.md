@@ -6,6 +6,27 @@
 
 ---
 
+## [Unreleased]
+
+## [3.18.6] - 2026-03-03
+
+### 추가됨 (Added)
+- 모바일 전용 페이지 초기 구현
+  - `mobile.html`, `styles/mobile.css`, `src/mobile/main_mobile.js`를 추가해 데스크톱과 분리된 모바일 셸 진입점을 만들었다
+  - 공용 게임 코어는 유지하고, 모바일 페이지는 `body.mobile-shell` 기준 레이아웃/캔버스/터치 UI를 별도로 적용한다
+  - 모바일 블록은 간소한 전용 셀 렌더 프리셋으로 분기된다
+  - 모바일 페이지에서 데스크톱 중앙 HUD를 제거하고, 공용 로직이 요구하는 식별자만 숨김 기술 패널로 분리했다
+  - `src/app/create_game_session.js`를 추가해 `AudioEngine / BackgroundFx / ScreenImpact / createGame` 초기화를 공용 세션 계층으로 분리했다
+  - `src/ui/hud_renderer.js`를 추가해 HUD 기본 수치, STATUS, INCOMING 렌더링을 공용 UI 계층으로 분리했다
+  - `src/ui/feedback_view.js`를 추가해 전투 콜아웃과 DEV PANEL 렌더링을 공용 피드백 계층으로 분리했다
+  - `src/ui/overlay_view.js`를 추가해 브리핑/결과/최근 전투 카드 오버레이 렌더링을 공용 오버레이 계층으로 분리했다
+  - `src/ui/overlay_controller.js`를 추가해 브리핑/설정/결과 오버레이의 상태 전이와 일시정지 연계를 공용 컨트롤러 계층으로 분리했다
+
+### 계획됨 (Planned)
+- 모바일 리팩터링 방향 전환
+  - 모바일을 데스크톱 반응형 하위셋이 아니라 별도 앱 셸로 재구성하는 다음 마일스톤 계획을 문서화
+  - 공용 게임 코어는 유지하고, 모바일은 전용 페이지/HUD/버튼/블록 렌더 프리셋/오버레이를 별도로 구축하는 방향으로 로드맵을 조정
+
 ## [3.17.1] - 2026-03-03
 
 ### 수정됨 (Fixed)

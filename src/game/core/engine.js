@@ -1,5 +1,5 @@
 ﻿/*
- * [v3.15.0] 메인 게임 엔진
+ * [v3.18.0] 메인 게임 엔진
  * 
  * 작성일: 2026-02-28
  * 변경사항: 
@@ -20,6 +20,7 @@
  *   - [v3.14.1] 일시정지 중 입력 누수 차단 및 스폰 보조 우선순위 문서화
  *   - [v3.14.2] 아이템 글로우 색상 파싱 예외 수정 및 바닥 접촉 후 자동 고정 누적 로직 보정
  *   - [v3.15.0] 전투 밸런스와 HUD 가독성 패스: 규칙 공격 지속시간/보너스 압박/피버 배수 완화
+ *   - [v3.18.0] mobile-shell 전용 간소 블록 렌더 프리셋 추가
  */
 
 import { Board } from "./board.js";
@@ -587,6 +588,41 @@ function drawNeonOverlay(ctx, state, cell, canvas, now) {
 }
 
 function drawStyledCell(ctx, x, y, cell, color, options = {}) {
+  if (document.body?.classList.contains("mobile-shell")) {
+    const inset = Math.max(1, options.inset ?? 1);
+    const size = cell - inset * 2;
+    const base = options.garbage ? mixColor(color, "#9ba6ba", 0.32) : color;
+    const light = mixColor(base, "#ffffff", options.current ? 0.32 : 0.22);
+    const shadow = mixColor(base, "#06101d", options.garbage ? 0.36 : 0.28);
+    const face = mixColor(base, "#0d1829", 0.16);
+
+    ctx.save();
+    if (!options.garbage) {
+      ctx.shadowColor = withAlpha(base, options.current ? 0.42 : 0.22);
+      ctx.shadowBlur = options.current ? 8 : 4;
+    }
+
+    const shell = ctx.createLinearGradient(x, y, x, y + cell);
+    shell.addColorStop(0, light);
+    shell.addColorStop(0.18, base);
+    shell.addColorStop(1, shadow);
+    ctx.fillStyle = shell;
+    ctx.fillRect(x + inset, y + inset, size, size);
+
+    ctx.fillStyle = withAlpha(face, 0.34);
+    ctx.fillRect(x + inset + 2, y + inset + 2, Math.max(2, size - 4), Math.max(2, size - 4));
+
+    ctx.fillStyle = withAlpha("#ffffff", options.garbage ? 0.1 : 0.18);
+    ctx.fillRect(x + inset + 2, y + inset + 2, Math.max(2, size - 4), Math.max(2, cell * 0.12));
+
+    ctx.strokeStyle = withAlpha(light, options.garbage ? 0.3 : 0.44);
+    ctx.lineWidth = Math.max(1, cell * 0.06);
+    ctx.strokeRect(x + inset + 0.5, y + inset + 0.5, size - 1, size - 1);
+
+    ctx.restore();
+    return;
+  }
+
   const inset = options.inset ?? 1;
   const size = cell - inset * 2;
   const base = options.garbage ? mixColor(color, "#b7bcc6", 0.28) : color;

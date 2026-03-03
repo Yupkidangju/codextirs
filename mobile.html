@@ -1,6 +1,6 @@
 ﻿<!--
   Dual Tetris Battle: Neon Wars
-  [v3.18.0] 메인 HTML - 모바일 페이지 자동 분기와 HUD/레이어 UI 반영
+  [v3.18.1] 모바일 전용 HTML - 데스크톱 HUD 의존을 걷어낸 모바일 전용 DOM 셸
   
   작성일: 2026-03-03
   작성자: AI Agent
@@ -10,28 +10,16 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
-  <title>Dual Tetris Battle: Neon Wars</title>
+  <title>Neon Wars Mobile</title>
   <meta name="description" content="AI와의 대전형 테트리스 배틀 게임 - Neon Wars" />
   <meta name="theme-color" content="#050810" />
   <link rel="icon" type="image/svg+xml" href="./favicon.svg" />
-  <script>
-    (() => {
-      const params = new URLSearchParams(window.location.search);
-      if (params.get("desktop") === "1") return;
-      const isPhoneLike = window.matchMedia("(max-width: 960px), ((max-height: 600px) and (pointer: coarse))").matches;
-      if (!isPhoneLike) return;
-      const target = new URL("./mobile.html", window.location.href);
-      target.search = window.location.search;
-      target.hash = window.location.hash;
-      window.location.replace(target.toString());
-    })();
-  </script>
-  <link rel="stylesheet" href="./styles/main.css" />
+  <link rel="stylesheet" href="./styles/mobile.css" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;600;700;800&display=swap" rel="stylesheet" />
 </head>
-<body>
+<body class="mobile-shell mobile-layout">
   <!-- 배경 효과 캔버스 -->
   <canvas id="bgFx" class="bg-fx" width="1920" height="1080" aria-hidden="true"></canvas>
 
@@ -132,8 +120,8 @@
       </div>
     </section>
 
-    <!-- 게임 스테이지: 3컬럼 레이아웃 -->
-    <main id="stage" class="stage desktop prestart">
+    <!-- 게임 스테이지: 모바일 전용 메인 보드 + PiP AI -->
+    <main id="stage" class="stage mobile-shell-stage prestart">
       
       <!-- 왼쪽: 플레이어 레인 -->
       <section class="lane player-lane">
@@ -164,68 +152,6 @@
         </div>
       </section>
 
-      <!-- 가운데: 상태/점수 패널 -->
-      <section class="center-panel">
-        <!-- VS 인디케이터 -->
-        <div class="vs-indicator">VS</div>
-        
-        <!-- 메인 HUD -->
-        <div class="main-hud">
-          <!-- 점수 패널 -->
-          <div class="hud-panel score-panel">
-            <div class="label">SCORE</div>
-            <div class="value" id="scoreValue">0</div>
-          </div>
-          
-          <!-- 콤보 패널 -->
-          <div class="hud-panel combo-panel">
-            <div class="label">COMBO</div>
-            <div class="value combo" id="comboValue">x0</div>
-          </div>
-          
-          <!-- 레벨 패널 -->
-          <div class="hud-panel level-panel">
-            <div class="label">LEVEL</div>
-            <div class="value" id="levelValue">1</div>
-          </div>
-          
-          <!-- 특수 게이지 -->
-          <div class="gauge-wrapper">
-            <div class="gauge-container" id="specialGauge">
-              <div class="gauge-bg"></div>
-              <div class="gauge-fill" style="--gauge-percent: 0%"></div>
-              <div class="gauge-inner">
-                <div class="gauge-value" id="gaugeValue">0%</div>
-                <div class="label">SPECIAL</div>
-              </div>
-            </div>
-          </div>
-          
-          <!-- 스킬 버튼 영역 [v5.0.0] -->
-          <div class="skills-panel" id="skillsPanel">
-            <div class="skills-title">SKILLS</div>
-            <div class="skill-buttons">
-              <button class="skill-btn" id="skillBtn1" data-skill="blind" disabled>
-                <span class="skill-key">1</span>
-                <span class="skill-name">블라인드</span>
-                <span class="skill-desc">상대 시야 차단</span>
-              </button>
-              <button class="skill-btn" id="skillBtn2" data-skill="swap" disabled>
-                <span class="skill-key">2</span>
-                <span class="skill-name">블록 스왑</span>
-                <span class="skill-desc">상대 블록 교환</span>
-              </button>
-              <button class="skill-btn" id="skillBtn3" data-skill="reflect" disabled>
-                <span class="skill-key">3</span>
-                <span class="skill-name">가비지 반사</span>
-                <span class="skill-desc">공격 반사 (5초)</span>
-              </button>
-            </div>
-            <div class="skills-hint">키 1, 2, 3 또는 클릭으로 사용</div>
-          </div>
-        </div>
-      </section>
-
       <!-- 오른쪽: AI 레인 -->
       <section class="lane ai-lane">
         <h2 class="lane-title">AI</h2>
@@ -247,6 +173,40 @@
               <div class="boss-hp-fill" id="bossHpFill" style="--boss-hp-percent: 100%"></div>
             </div>
             <div class="value" id="bossHpValue">100%</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- [v3.18.1] 모바일 셸 기술 패널 -->
+      <!-- 설명: main.js가 요구하는 HUD/게이지/스킬 식별자는 유지하되 실제 모바일 표시 계층과 분리한다. -->
+      <section class="mobile-tech-panel" aria-hidden="true">
+        <div class="mobile-tech-stats">
+          <span id="scoreValue">0</span>
+          <span id="comboValue">x0</span>
+          <span id="levelValue">1</span>
+        </div>
+        <div class="gauge-container mobile-tech-gauge" id="specialGauge">
+          <div class="gauge-bg"></div>
+          <div class="gauge-fill" style="--gauge-percent: 0%"></div>
+          <div class="gauge-inner">
+            <div class="gauge-value" id="gaugeValue">0%</div>
+            <div class="label">SPECIAL</div>
+          </div>
+        </div>
+        <div class="skills-panel mobile-tech-skills" id="skillsPanel">
+          <div class="skill-buttons">
+            <button class="skill-btn" id="skillBtn1" data-skill="blind" disabled>
+              <span class="skill-key">1</span>
+              <span class="skill-name">블라인드</span>
+            </button>
+            <button class="skill-btn" id="skillBtn2" data-skill="swap" disabled>
+              <span class="skill-key">2</span>
+              <span class="skill-name">블록 스왑</span>
+            </button>
+            <button class="skill-btn" id="skillBtn3" data-skill="reflect" disabled>
+              <span class="skill-key">3</span>
+              <span class="skill-name">가비지 반사</span>
+            </button>
           </div>
         </div>
       </section>
@@ -591,6 +551,6 @@
   </div>
 
   <!-- 메인 스크립트 -->
-  <script type="module" src="./src/main.js"></script>
+  <script type="module" src="./src/mobile/main_mobile.js"></script>
 </body>
 </html>

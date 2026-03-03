@@ -1,5 +1,5 @@
 ﻿/*
- * [v3.17.1] 메인 엔트리 포인트
+ * [v3.18.6] 메인 엔트리 포인트
  * 
  * 작성일: 2026-03-01
  * 변경사항: 
@@ -23,15 +23,32 @@
  *   - [v3.15.1] 모바일 보드 축소/버튼 확대 기준 보정
  *   - [v3.17.0] 모바일 보드 컨테이너 기반 리사이징과 ResizeObserver 동기화
  *   - [v3.17.1] stage.mobile 클래스 기반 강제 오버라이드와 가로 모바일 판정 보정
+ *   - [v3.18.0] mobile.html 전용 셸, body.mobile-shell 감지, 모바일 전용 빌드 버전 갱신
+ *   - [v3.18.1] mobile.html에서 데스크톱 중앙 HUD를 제거해도 동작하도록 모바일 기술 패널 구조를 허용
+ *   - [v3.18.2] Audio/Impact/Game 조립을 공용 create_game_session 계층으로 분리
+ *   - [v3.18.3] HUD 상태 렌더링을 src/ui/hud_renderer.js로 분리
+ *   - [v3.18.4] 전투 콜아웃과 DEV PANEL 렌더링을 src/ui/feedback_view.js로 분리
+ *   - [v3.18.5] 브리핑/결과/최근 전투 카드 오버레이 렌더링을 src/ui/overlay_view.js로 분리
+ *   - [v3.18.6] 오버레이 상태 전이를 src/ui/overlay_controller.js로 분리
  */
 
-import { createGame } from "./game/core/engine.js";
 import { installKeyboard } from "./input/keyboard.js";
 import { installTouch } from "./input/touch.js";
 import { applyLayout, detectMobile, initMobileLayout } from "./ui/layout.js";
-import { AudioEngine } from "./audio/midi_player.js";
-import { BackgroundFx } from "./render/background.js";
-import { ScreenImpact } from "./render/effects.js";
+import { createGameSession } from "./app/create_game_session.js";
+import {
+  getIncomingAttackLabel,
+  renderIncomingPreviewView,
+  renderStatusEffectsView,
+  syncAudioStatusView,
+  updatePrimaryHudView,
+} from "./ui/hud_renderer.js";
+import {
+  createBattleCalloutController,
+  renderDevPanelView,
+  syncTouchDebugVisibility,
+} from "./ui/feedback_view.js";
+import { createOverlayController } from "./ui/overlay_controller.js";
 import { PIECES } from "./game/core/pieces.js";
 import { initAchievements } from "./game/achievements.js";
 import { getPlayerSkillManager, getAiSkillManager, SkillType } from "./game/battle/skills.js"; // [v5.0.0] 스킬 시스템 통합
@@ -114,7 +131,8 @@ let mobileBoardResizeObserver = null;
 let observedMobileBoardWrap = null;
 
 function isMobileCanvasLayout() {
-  return window.matchMedia("(max-width: 768px)").matches;
+  return document.body?.classList.contains("mobile-shell")
+    || window.matchMedia("(max-width: 768px)").matches;
 }
 
 function getPlayerBoardWrap() {
@@ -332,29 +350,29 @@ const mobileSkillBtns = [
 ];
 
 // 오디오 및 렌더링
-const audio = new AudioEngine();
-const bgFx = bgFxCanvas
-  ? new BackgroundFx(bgFxCanvas)
-  : { resize() {}, tick() {}, draw() {} };
-const impact = new ScreenImpact(document.documentElement);
+let audio = null;
+let bgFx = null;
+let impact = null;
 let game = null;
 
 // 게임 상태
 let selectedDifficulty = "기사";
 let hasStarted = false;
 let starting = false;
-let settingsPausedGame = false;
-let briefingPausedGame = false;
-let battleCalloutTimer = null;
-let briefingStepIndex = 0;
 let activeRebindAction = "";
 // [v3.0.1-fix] 업적 시스템을 실제 게임 이벤트 흐름과 연결하여 저장/알림이 동작하도록 복구했다.
 const achievementSystem = initAchievements(showAchievementNotification, () => {
   audio.playAchievementUnlockSound?.();
 });
 
-const SETTINGS_STORAGE_KEY = "codextirs.settings.v3.14.1";
+const SETTINGS_STORAGE_KEY = "codextirs.settings.v3.18.6";
 const LEGACY_SETTINGS_STORAGE_KEYS = [
+  "codextirs.settings.v3.18.5",
+  "codextirs.settings.v3.18.4",
+  "codextirs.settings.v3.18.3",
+  "codextirs.settings.v3.18.2",
+  "codextirs.settings.v3.18.0",
+  "codextirs.settings.v3.14.1",
   "codextirs.settings.v3.14.0",
   "codextirs.settings.v3.13.0",
   "codextirs.settings.v3.12.0",
@@ -457,8 +475,6 @@ let lastSpecialReady = false;
 let lastIncomingCount = 0;
 let lastBossPhase = 0;
 let hiddenPausedGame = false;
-let lastCalloutSignature = "";
-let lastCalloutAt = 0;
 let sessionMetrics = createSessionMetrics();
 let sessionDiagnostics = createSessionDiagnostics();
 let lastAudioCtxState = "";
@@ -469,6 +485,26 @@ const touchMetrics = {
   lastDeltaMs: 0,
   lastAt: 0,
 };
+
+const session = createGameSession({
+  playerCanvas,
+  aiCanvas,
+  bgFxCanvas,
+  onHud: updateHUD,
+  onEvent: handleGameEvent,
+  getInputTuning: () => uiSettings.inputTuning,
+  impactRoot: document.documentElement,
+});
+audio = session.audio;
+bgFx = session.bgFx;
+impact = session.impact;
+game = session.game;
+const battleCalloutView = createBattleCalloutController({
+  root: battleCallout,
+  titleEl: battleCalloutTitle,
+  subtitleEl: battleCalloutSubtitle,
+  audio,
+});
 
 const ONBOARDING_MISSIONS = [
   { id: "hold", title: "홀드 1회 사용", detail: "C 키 또는 모바일 H 버튼" },
@@ -500,6 +536,54 @@ const BRIEFING_STEPS = [
     highlights: ["ARCADE: 강한 타격감", "FOCUS: BGM 비중 축소", "QUIET: 야간 플레이용"],
   },
 ];
+
+const overlayController = createOverlayController({
+  game: () => game,
+  audio: () => audio,
+  hasStarted: () => hasStarted,
+  isStarting: () => starting,
+  startScreen: () => startScreen,
+  beginBattle: () => beginBattle(),
+  applyUiSettings,
+  endRebindCapture,
+  syncRotateHint,
+  markBriefingSeen: () => {
+    uiSettings.briefingSeen = true;
+    saveUiSettings();
+  },
+  loadRecentBattle,
+  briefingSteps: BRIEFING_STEPS,
+  briefingElements: {
+    briefingOverlay,
+    briefingStepValue,
+    briefingTitle,
+    briefingText,
+    briefingHighlights,
+    briefingDots,
+    briefingNextBtn,
+  },
+  settingsElements: {
+    settingsOverlay,
+  },
+  resultElements: {
+    resultOverlay,
+    resultEyebrow,
+    resultTitle,
+    resultSummary,
+    resultFeedbackList,
+    resultScore,
+    resultLines,
+    resultMaxCombo,
+    resultTSpins,
+    resultTetrises,
+    resultPerfects,
+  },
+  recentBattleElements: {
+    recentBattleCard,
+    recentBattleResult,
+    recentBattleMeta,
+  },
+});
 
 function showAchievementNotification(achievement) {
   const name = achievement.name?.ko || "도전 과제";
@@ -891,18 +975,12 @@ function syncImpactProfile(levelName = selectedDifficulty) {
 }
 
 function syncAudioStatus() {
-  if (bgmStateValue) {
-    bgmStateValue.textContent = audio.getBGMState().toUpperCase();
-  }
-  if (trackNameValue) {
-    trackNameValue.textContent = audio.getCurrentTrackName();
-  }
-  if (musicDriveValue) {
-    musicDriveValue.textContent = audio.getMusicDriveLabel?.() || "CALM";
-  }
-  if (bossLayerValue) {
-    bossLayerValue.textContent = audio.getBossLayerLabel?.() || "OFF";
-  }
+  syncAudioStatusView(audio, {
+    bgmStateValue,
+    trackNameValue,
+    musicDriveValue,
+    bossLayerValue,
+  });
 }
 
 function renderMissionChecklist() {
@@ -954,41 +1032,42 @@ function syncRotateHint() {
 }
 
 function syncTouchDebugPanel() {
-  if (!touchDebugPanel) return;
-  const visible = !!uiSettings.devPanel;
-  touchDebugPanel.classList.toggle("hidden", !visible);
+  syncTouchDebugVisibility(touchDebugPanel, !!uiSettings.devPanel);
 }
 
 function syncDevPanel() {
-  if (touchDebugAction) {
-    touchDebugAction.textContent = touchMetrics.lastAction;
-  }
-  if (touchDebugMeta) {
-    touchDebugMeta.textContent = `press:${touchMetrics.presses} · repeat:${touchMetrics.repeats} · last:${touchMetrics.lastDeltaMs}ms · shift:${sessionDiagnostics.neonShiftActivations} · resonance:${sessionDiagnostics.resonanceTriggers} · counter:${sessionDiagnostics.layerCounters}`;
-  }
-  if (devFpsMeta) {
-    devFpsMeta.textContent = `fps:${Math.round(sessionDiagnostics.currentFps || 0)} · avg:${Math.round(sessionDiagnostics.avgFps || 0)} · min:${Math.round(sessionDiagnostics.minFps || 0)}`;
-  }
-  if (devAudioMeta) {
-    const audioSnapshot = audio.getAudioDebugSnapshot?.() || {};
-    devAudioMeta.textContent = `audio:${audioSnapshot.ctxState || "idle"} · bgm:${audioSnapshot.bgmState || "normal"} · drive:${audioSnapshot.driveLabel || "-"} · track:${audioSnapshot.trackName || "-"}`;
-  }
-  if (devGameMeta) {
-    const incomingCount = game?.getIncomingAttacks?.("player")?.length || 0;
-    const aiState = game?.getState?.("ai");
-    const playerState = game?.getState?.("player");
-    const shiftActive = !!playerState && (playerState.neonShiftUntil || 0) > performance.now();
-    const residueCount = Array.isArray(playerState?.neonResidueRows)
-      ? playerState.neonResidueRows.filter((entry) => (entry?.until || 0) > performance.now()).length
-      : 0;
-    const counterLabel = playerState && (playerState.layerCounterUntil || 0) > performance.now()
-      ? (playerState.layerCounterLabel || "on")
-      : "off";
-    devGameMeta.textContent = `boss:${getBossPhase(aiState)} · incoming:${incomingCount} · shift:${shiftActive ? "on" : "off"} · residue:${residueCount} · counter:${counterLabel}`;
-  }
-  if (devErrorMeta) {
-    devErrorMeta.textContent = `error:${sessionDiagnostics.lastError || "none"}`;
-  }
+  const now = performance.now();
+  const incomingCount = game?.getIncomingAttacks?.("player")?.length || 0;
+  const aiState = game?.getState?.("ai");
+  const playerState = game?.getState?.("player");
+  const shiftActive = !!playerState && (playerState.neonShiftUntil || 0) > now;
+  const residueCount = Array.isArray(playerState?.neonResidueRows)
+    ? playerState.neonResidueRows.filter((entry) => (entry?.until || 0) > now).length
+    : 0;
+  const counterLabel = playerState && (playerState.layerCounterUntil || 0) > now
+    ? (playerState.layerCounterLabel || "on")
+    : "off";
+
+  renderDevPanelView({
+    touchMetrics,
+    sessionDiagnostics,
+    audioSnapshot: audio.getAudioDebugSnapshot?.() || {},
+    gameSnapshot: {
+      bossPhase: getBossPhase(aiState),
+      incomingCount,
+      shiftActive,
+      residueCount,
+      counterLabel,
+    },
+    elements: {
+      touchDebugAction,
+      touchDebugMeta,
+      devFpsMeta,
+      devAudioMeta,
+      devGameMeta,
+      devErrorMeta,
+    },
+  });
 }
 
 function applyMobileLayoutPreset(layoutName = "default") {
@@ -1079,7 +1158,7 @@ function recordRuntimeError(source, error) {
 
 function exportSessionDiagnostics() {
   const snapshot = {
-    buildVersion: "3.17.1",
+    buildVersion: "3.18.6",
     deviceMeta: getDeviceMeta(),
     uiSettings,
     sessionDiagnostics,
@@ -1212,118 +1291,27 @@ function analyzeBattleSummary(summary) {
 }
 
 function renderBriefingStep() {
-  const step = BRIEFING_STEPS[briefingStepIndex];
-  if (!step) return;
-
-  if (briefingStepValue) {
-    briefingStepValue.textContent = `${briefingStepIndex + 1} / ${BRIEFING_STEPS.length}`;
-  }
-  if (briefingTitle) {
-    briefingTitle.textContent = step.title;
-  }
-  if (briefingText) {
-    briefingText.textContent = step.text;
-  }
-  if (briefingHighlights) {
-    briefingHighlights.innerHTML = step.highlights
-      .map((item) => `<div class="briefing-chip">${item}</div>`)
-      .join("");
-  }
-  if (briefingDots) {
-    briefingDots.innerHTML = BRIEFING_STEPS
-      .map((_, index) => `<span class="briefing-dot ${index === briefingStepIndex ? "active" : ""}"></span>`)
-      .join("");
-  }
-  if (briefingNextBtn) {
-    briefingNextBtn.textContent = briefingStepIndex === BRIEFING_STEPS.length - 1 ? "START NOW" : "NEXT";
-  }
+  overlayController.renderBriefingStep();
 }
 
 function openBriefing(force = false) {
-  if (!briefingOverlay) return;
-  if (!force && document.body.classList.contains("briefing-open")) return;
-
-  briefingPausedGame = !!hasStarted && game?.isRunning?.() && !game?.isGameOver?.();
-  if (briefingPausedGame) {
-    game.pause();
-    audio.stopBgm();
-  }
-
-  briefingStepIndex = 0;
-  renderBriefingStep();
-  briefingOverlay.classList.add("visible");
-  briefingOverlay.setAttribute("aria-hidden", "false");
-  document.body.classList.add("briefing-open");
-  syncRotateHint();
+  overlayController.openBriefing(force);
 }
 
 function closeBriefing(markSeen = true) {
-  if (!briefingOverlay) return;
-  briefingOverlay.classList.remove("visible");
-  briefingOverlay.setAttribute("aria-hidden", "true");
-  document.body.classList.remove("briefing-open");
-
-  if (markSeen) {
-    uiSettings.briefingSeen = true;
-    saveUiSettings();
-  }
-
-  if (briefingPausedGame && hasStarted && !game?.isGameOver?.()) {
-    game.pause();
-    if (!audio.muted) {
-      audio.setBGMState(audio.getBGMState(), true);
-    }
-  }
-  briefingPausedGame = false;
-  syncRotateHint();
+  overlayController.closeBriefing(markSeen);
 }
 
 function advanceBriefing() {
-  if (briefingStepIndex >= BRIEFING_STEPS.length - 1) {
-    closeBriefing(true);
-    if (!hasStarted && !starting && !startScreen?.classList.contains("hidden")) {
-      beginBattle();
-    }
-    return;
-  }
-  briefingStepIndex += 1;
-  renderBriefingStep();
+  overlayController.advanceBriefing();
 }
 
 function openSettings() {
-  if (!settingsOverlay) return;
-  if (document.body.classList.contains("briefing-open")) return;
-  endRebindCapture();
-
-  settingsPausedGame = !!hasStarted && game?.isRunning?.() && !game?.isGameOver?.();
-  if (settingsPausedGame) {
-    game.pause();
-    audio.stopBgm();
-  }
-
-  applyUiSettings();
-  settingsOverlay.classList.add("visible");
-  settingsOverlay.setAttribute("aria-hidden", "false");
-  document.body.classList.add("settings-open");
-  syncRotateHint();
+  overlayController.openSettings();
 }
 
 function closeSettings() {
-  if (!settingsOverlay) return;
-  endRebindCapture();
-
-  settingsOverlay.classList.remove("visible");
-  settingsOverlay.setAttribute("aria-hidden", "true");
-  document.body.classList.remove("settings-open");
-
-  if (settingsPausedGame && hasStarted && !game?.isGameOver?.()) {
-    game.pause();
-    if (!audio.muted) {
-      audio.setBGMState(audio.getBGMState(), true);
-    }
-  }
-  settingsPausedGame = false;
-  syncRotateHint();
+  overlayController.closeSettings();
 }
 
 function saveRecentBattle(summary) {
@@ -1345,15 +1333,7 @@ function loadRecentBattle() {
 }
 
 function syncRecentBattleCard() {
-  if (!recentBattleCard || !recentBattleResult || !recentBattleMeta) return;
-
-  const summary = loadRecentBattle();
-  const shouldShow = !!summary && !hasStarted && !!startScreen && !startScreen.classList.contains("hidden");
-  recentBattleCard.classList.toggle("hidden", !shouldShow);
-  if (!shouldShow) return;
-
-  recentBattleResult.textContent = summary.winner === "player" ? `VICTORY · ${summary.difficulty}` : `DEFEAT · ${summary.difficulty}`;
-  recentBattleMeta.textContent = `점수 ${Number(summary.score || 0).toLocaleString()} · 최대 콤보 x${summary.maxCombo || 0} · ${(summary.duration || 0).toFixed(1)}초`;
+  overlayController.syncRecentBattleCard();
 }
 
 function syncBattleWidgetsVisibility() {
@@ -1362,43 +1342,7 @@ function syncBattleWidgetsVisibility() {
 }
 
 function showBattleCallout(title, subtitle = "", tone = "", voiceTag = "") {
-  if (!battleCallout || !battleCalloutTitle || !battleCalloutSubtitle) return;
-  const now = performance.now();
-  const signature = `${title}::${subtitle}::${tone}`;
-  if (signature === lastCalloutSignature && (now - lastCalloutAt) < 420) {
-    return;
-  }
-  lastCalloutSignature = signature;
-  lastCalloutAt = now;
-
-  if (tone === "gold" || tone === "warn") {
-    audio.duckBgm?.(tone === "gold" ? 0.74 : 0.8, 0.3);
-  }
-  if (voiceTag) {
-    audio.playVoiceCue?.(voiceTag, tone === "warn" ? 0.9 : 1);
-  }
-
-  battleCalloutTitle.textContent = title;
-  battleCalloutSubtitle.textContent = subtitle;
-  battleCalloutSubtitle.style.display = subtitle ? "block" : "none";
-  battleCallout.classList.remove("warn", "gold", "visible");
-  if (tone) {
-    battleCallout.classList.add(tone);
-  }
-
-  void battleCallout.offsetWidth;
-  battleCallout.classList.add("visible");
-
-  if (battleCalloutTimer) {
-    clearTimeout(battleCalloutTimer);
-  }
-  battleCalloutTimer = setTimeout(() => {
-    battleCallout.classList.remove("visible", "warn", "gold");
-  }, 1300);
-}
-
-function formatRemainingTime(seconds) {
-  return `${Math.max(0.1, seconds).toFixed(seconds >= 10 ? 0 : 1)}s`;
+  battleCalloutView.show(title, subtitle, tone, voiceTag);
 }
 
 function getComboPhraseTier(combo) {
@@ -1406,169 +1350,6 @@ function getComboPhraseTier(combo) {
   if (combo >= 7) return 2;
   if (combo >= 4) return 1;
   return 0;
-}
-
-function renderStatusEffects(playerState) {
-  if (!statusEffects || !statusCountValue) return;
-  if (!hasStarted || !playerState) {
-    statusCountValue.textContent = "0";
-    statusEffects.innerHTML = '<div class="status-empty">활성 상태 없음</div>';
-    return;
-  }
-
-  const now = performance.now();
-  const skillManager = getPlayerSkillManager();
-  const fever = getFeverStatus();
-  const effects = [];
-
-  if (fever.active) {
-    effects.push({ label: `FEVER ${fever.label || "FORGE"}`, time: fever.remainingTime, tone: "buff", priority: 105 });
-  }
-  const neonShiftRemain = ((playerState.neonShiftUntil || 0) - now) / 1000;
-  if (neonShiftRemain > 0) {
-    effects.push({ label: "SHIFT", time: neonShiftRemain, tone: "neon", priority: 110 });
-  }
-  const blindRemain = ((skillManager.activeEffects?.blind?.endTime || 0) - now) / 1000;
-  if (blindRemain > 0) {
-    effects.push({ label: "BLIND", time: blindRemain, tone: "debuff", priority: 85 });
-  }
-  const reflectRemain = ((skillManager.activeEffects?.garbageReflect?.endTime || 0) - now) / 1000;
-  if (reflectRemain > 0) {
-    effects.push({ label: "REFLECT", time: reflectRemain, tone: "buff", priority: 70 });
-  }
-
-  const residueCount = Array.isArray(playerState.neonResidueRows)
-    ? playerState.neonResidueRows.filter((entry) => (entry?.until || 0) > now).length
-    : 0;
-  if (residueCount > 0) {
-    effects.push({ label: `RESIDUE x${residueCount}`, time: 99, tone: "neon", priority: 60 });
-  }
-  const layerCounterRemain = ((playerState.layerCounterUntil || 0) - now) / 1000;
-  if (layerCounterRemain > 0) {
-    effects.push({ label: playerState.layerCounterLabel || "COUNTER", time: layerCounterRemain, tone: "buff", priority: 97 });
-  }
-  const itemBoostRemain = ((playerState.neonItemBoostUntil || 0) - now) / 1000;
-  if (itemBoostRemain > 0) {
-    effects.push({ label: "SURGE+", time: itemBoostRemain, tone: "buff", priority: 66 });
-  }
-
-  [
-    ["DARK", (playerState.darknessUntil - now) / 1000, "debuff", 98],
-    ["MIRROR", (playerState.mirrorMoveUntil - now) / 1000, "debuff", 96],
-    ["CORRUPT", (playerState.corruptNextUntil - now) / 1000, "warning", 78],
-    ["JOLT", (playerState.gravityJoltUntil - now) / 1000, "warning", 72],
-    ["STAGGER", (playerState.inputDelayUntil - now) / 1000, "warning", 92],
-    ["HOLD LOCK", (playerState.holdLockUntil - now) / 1000, "warning", 102],
-    ["GHOST OFF", (playerState.ghostHiddenUntil - now) / 1000, "debuff", 90],
-    ["ROT TAX", (playerState.rotationTaxUntil - now) / 1000, "warning", 100],
-    ["LEECH", (playerState.gaugeLeechUntil - now) / 1000, "warning", 94],
-    ["SCRAMBLE", (playerState.nextScrambleUntil - now) / 1000, "debuff", 88],
-  ].forEach(([label, time, tone, priority]) => {
-    if (time > 0) {
-      effects.push({ label, time, tone, priority });
-    }
-  });
-
-  effects.sort((a, b) => {
-    if ((b.priority || 0) !== (a.priority || 0)) return (b.priority || 0) - (a.priority || 0);
-    return (a.time || 0) - (b.time || 0);
-  });
-
-  statusCountValue.textContent = String(effects.length);
-  if (!effects.length) {
-    statusEffects.innerHTML = '<div class="status-empty">활성 상태 없음</div>';
-    return;
-  }
-
-  const maxVisibleEffects = detectMobile() ? 4 : 5;
-  const visibleEffects = effects.slice(0, maxVisibleEffects);
-  const hiddenCount = Math.max(0, effects.length - visibleEffects.length);
-  statusEffects.innerHTML = visibleEffects
-    .map(({ label, time, tone }) => {
-      return `<div class="status-chip ${tone}"><span class="status-name">${label}</span><span class="status-time">${formatRemainingTime(time)}</span></div>`;
-    })
-    .concat(hiddenCount > 0 ? [`<div class="status-chip meta"><span class="status-name">+${hiddenCount} MORE</span></div>`] : [])
-    .join("");
-}
-
-function getIncomingAttackLabel(type) {
-  const labels = {
-    GarbagePush: "GARBAGE",
-    CorruptNext: "CORRUPT",
-    GravityJolt: "JOLT",
-    StackShake: "STAGGER",
-    Darkness: "DARK",
-    MirrorMove: "MIRROR",
-    HoldLock: "HOLD LOCK",
-    GhostOut: "GHOST OFF",
-    RotationTax: "ROT TAX",
-    GaugeLeech: "LEECH",
-    NextScramble: "SCRAMBLE",
-    PierceBarrage: "PIERCE",
-    DrillHex: "DRILL HEX",
-    WavePush: "WAVE PUSH",
-    NullBurst: "NULL BURST",
-  };
-  return labels[type] || type.toUpperCase();
-}
-
-function renderIncomingPreview() {
-  if (!incomingValue || !incomingQueue) return;
-  if (!hasStarted || !game) {
-    incomingValue.textContent = "0";
-    incomingQueue.innerHTML = '<div class="incoming-empty">위협 없음</div>';
-    return;
-  }
-
-  const pendingAttacks = game.getIncomingAttacks("player") || [];
-  const totalGarbage = pendingAttacks.reduce((sum, pending) => {
-    if (pending.attackEvent?.type !== "GarbagePush") return sum;
-    return sum + Math.max(0, pending.attackEvent?.strength || 0);
-  }, 0);
-
-  incomingValue.textContent = String(totalGarbage);
-  if (!pendingAttacks.length) {
-    incomingQueue.innerHTML = '<div class="incoming-empty">위협 없음</div>';
-    return;
-  }
-
-  const grouped = new Map();
-  pendingAttacks.forEach((pending) => {
-    const type = pending.attackEvent?.type || "Unknown";
-    const strength = Math.max(0, pending.attackEvent?.strength || 0);
-    const current = grouped.get(type) || {
-      type,
-      totalStrength: 0,
-      count: 0,
-      minRemainingMs: Number.POSITIVE_INFINITY,
-    };
-    current.totalStrength += strength;
-    current.count += 1;
-    current.minRemainingMs = Math.min(current.minRemainingMs, pending.remainingMs || 0);
-    grouped.set(type, current);
-  });
-
-  const groupedAttacks = [...grouped.values()].sort((a, b) => {
-    if (a.type === "GarbagePush" && b.type !== "GarbagePush") return -1;
-    if (a.type !== "GarbagePush" && b.type === "GarbagePush") return 1;
-    return a.minRemainingMs - b.minRemainingMs;
-  });
-  const maxVisibleIncoming = detectMobile() ? 3 : 4;
-  const visibleIncoming = groupedAttacks.slice(0, maxVisibleIncoming);
-  const hiddenCount = Math.max(0, groupedAttacks.length - visibleIncoming.length);
-
-  incomingQueue.innerHTML = visibleIncoming
-    .map((entry) => {
-      const tone = entry.type === "GarbagePush" ? "garbage" : "special";
-      const amountText = entry.type === "GarbagePush"
-        ? ` +${entry.totalStrength}`
-        : entry.count > 1
-          ? ` x${entry.count}`
-          : "";
-      return `<div class="incoming-chip ${tone}"><span class="incoming-name">${getIncomingAttackLabel(entry.type)}${amountText}</span><span class="incoming-time">${formatRemainingTime(entry.minRemainingMs / 1000)}</span></div>`;
-    })
-    .concat(hiddenCount > 0 ? [`<div class="incoming-chip meta"><span class="incoming-name">+${hiddenCount} MORE</span></div>`] : [])
-    .join("");
 }
 
 function maybeShowContextHints(playerState) {
@@ -1644,61 +1425,11 @@ function buildBattleSummary(winner) {
 }
 
 function showResultOverlay(summary) {
-  if (!resultOverlay) return;
-
-  resultOverlay.classList.remove("victory", "defeat");
-  resultOverlay.classList.add(summary.winner === "player" ? "victory" : "defeat");
-  resultOverlay.classList.add("visible");
-  resultOverlay.setAttribute("aria-hidden", "false");
-  document.body.classList.add("result-open");
-  syncRotateHint();
-
-  if (resultEyebrow) {
-    resultEyebrow.textContent = summary.winner === "player" ? "BATTLE WON" : "BATTLE LOST";
-  }
-  if (resultTitle) {
-    resultTitle.textContent = summary.winner === "player" ? "VICTORY" : "DEFEAT";
-  }
-  if (resultSummary) {
-    const bossSuffix = summary.bossHp !== null ? ` · 보스 HP ${summary.bossHp}%` : "";
-    resultSummary.textContent = `${summary.difficulty} 전투 종료 · ${summary.duration.toFixed(1)}초${bossSuffix}`;
-  }
-  if (resultFeedbackList) {
-    resultFeedbackList.innerHTML = (summary.feedback || [])
-      .map((item) => `
-        <div class="result-feedback-card">
-          <strong>${item.title}</strong>
-          <span>${item.text}</span>
-        </div>
-      `)
-      .join("");
-  }
-  if (resultScore) {
-    resultScore.textContent = Number(summary.score).toLocaleString();
-  }
-  if (resultLines) {
-    resultLines.textContent = String(summary.lines);
-  }
-  if (resultMaxCombo) {
-    resultMaxCombo.textContent = `x${summary.maxCombo}`;
-  }
-  if (resultTSpins) {
-    resultTSpins.textContent = String(summary.tSpins);
-  }
-  if (resultTetrises) {
-    resultTetrises.textContent = String(summary.tetrises);
-  }
-  if (resultPerfects) {
-    resultPerfects.textContent = String(summary.perfects);
-  }
+  overlayController.showResultOverlay(summary);
 }
 
 function hideResultOverlay() {
-  if (!resultOverlay) return;
-  resultOverlay.classList.remove("visible", "victory", "defeat");
-  resultOverlay.setAttribute("aria-hidden", "true");
-  document.body.classList.remove("result-open");
-  syncRotateHint();
+  overlayController.hideResultOverlay();
 }
 
 function previewParseHexColor(color) {
@@ -1890,82 +1621,32 @@ function updateHUD(pState, aState) {
   const neonShiftBoost = (pState.neonShiftUntil || 0) > now ? 0.45 : 0;
   bgFx.setEnergy?.((Number(audioSnapshot.drive || 0) * 1.15) + neonShiftBoost);
   document.body.classList.toggle("neon-shift-active", hasStarted && ((pState.neonShiftUntil || 0) > now));
-
-  const percent = Math.floor(pState.specialGauge);
-  
-  // 데스크톱 HUD 업데이트
-  // 점수
-  if (scoreValue) {
-    scoreValue.textContent = pState.score.toLocaleString();
-  }
-  
-  // 콤보
-  if (comboValue) {
-    comboValue.textContent = `x${pState.combo}`;
-    if (pState.combo > 0) {
-      comboValue.classList.add("combo-active");
-    } else {
-      comboValue.classList.remove("combo-active");
-    }
-  }
-  
-  // 레벨
-  if (levelValue) {
-    levelValue.textContent = `Lv ${pState.level}`;
-  }
-  
-  // AI 레벨
-  if (aiLevelValue) {
-    aiLevelValue.textContent = aState.id === "ai" ? selectedDifficulty : "-";
-  }
-  if (bossHpPanel) {
-    bossHpPanel.classList.toggle("hidden", !aState.bossModeEnabled);
-  }
-  if (bossHpValue) {
-    const bossHp = Math.max(0, Math.floor(aState.bossHp ?? 100));
-    bossHpValue.textContent = `${bossHp}%`;
-  }
-  if (bossHpFill) {
-    bossHpFill.style.setProperty("--boss-hp-percent", `${Math.max(0, aState.bossHp ?? 100)}%`);
-  }
-  
-  // 필살기 게이지
-  if (gaugeValue && specialGauge) {
-    gaugeValue.textContent = `${percent}%`;
-    specialGauge.style.setProperty("--gauge-percent", `${percent}%`);
-    
-    // MAX 상태
-    if (pState.specialReady) {
-      specialGauge.parentElement.classList.add("gauge-max");
-    } else {
-      specialGauge.parentElement.classList.remove("gauge-max");
-    }
-  }
-  
-  // [v3.0.0] 모바일 상태바 업데이트
-  if (mobileScore) {
-    mobileScore.textContent = pState.score.toLocaleString();
-  }
-  if (mobileCombo) {
-    mobileCombo.textContent = `x${pState.combo}`;
-  }
-  if (mobileLevel) {
-    mobileLevel.textContent = pState.level;
-  }
-  if (mobileGaugeFill) {
-    mobileGaugeFill.style.setProperty("--gauge-percent", `${percent}%`);
-  }
-  
-  // [v5.0.0] 스킬 버튼 활성화/비활성화
   const skillManager = getPlayerSkillManager();
-  const skillButtons = [skillBtn1, skillBtn2, skillBtn3, ...mobileSkillBtns];
-  const skillTypes = [SkillType.BLIND, SkillType.BLOCK_SWAP, SkillType.GARBAGE_REFLECT];
-  
-  skillButtons.forEach((btn, index) => {
-    if (btn) {
-      const canUse = skillManager.canUseSkill(skillTypes[index % skillTypes.length]);
-      btn.disabled = !canUse;
-    }
+  updatePrimaryHudView({
+    pState,
+    aState,
+    selectedDifficulty,
+    elements: {
+      scoreValue,
+      comboValue,
+      levelValue,
+      aiLevelValue,
+      bossHpPanel,
+      bossHpValue,
+      bossHpFill,
+      gaugeValue,
+      specialGauge,
+      mobileScore,
+      mobileCombo,
+      mobileLevel,
+      mobileGaugeFill,
+      skillBtn1,
+      skillBtn2,
+      skillBtn3,
+    },
+    skillManager,
+    skillTypes: [SkillType.BLIND, SkillType.BLOCK_SWAP, SkillType.GARBAGE_REFLECT],
+    mobileSkillBtns,
   });
   
   // 홀드 블록
@@ -1994,8 +1675,23 @@ function updateHUD(pState, aState) {
     }
   }
 
-  renderStatusEffects(pState);
-  renderIncomingPreview();
+  renderStatusEffectsView({
+    container: statusEffects,
+    countValue: statusCountValue,
+    hasStarted,
+    playerState: pState,
+    isMobile: detectMobile(),
+    skillManager,
+    feverStatus: getFeverStatus(),
+    nowMs: now,
+  });
+  renderIncomingPreviewView({
+    valueEl: incomingValue,
+    queueEl: incomingQueue,
+    hasStarted,
+    pendingAttacks,
+    isMobile: detectMobile(),
+  });
   maybeShowContextHints(pState);
 }
 
@@ -2314,14 +2010,7 @@ function handleGameEvent(evt, data) {
   }
 }
 
-// 게임 인스턴스 생성
-game = createGame({
-  playerCanvas,
-  aiCanvas,
-  onHud: updateHUD,
-  onEvent: handleGameEvent,
-  getInputTuning: () => uiSettings.inputTuning,
-});
+// [v3.18.2] 게임 인스턴스는 공용 create_game_session 계층에서 먼저 생성한다.
 applyUiSettings();
 syncBattleWidgetsVisibility();
 syncRecentBattleCard();
@@ -2462,9 +2151,24 @@ function returnToTitle() {
   audio.resetFeverBGMSpeed?.();
   audio.updateBossPhase?.({ enabled: false, phase: 0, hpPercent: 0 });
   achievementSystem.onFeverChange(false);
-  battleCallout?.classList.remove("visible", "warn", "gold");
-  renderStatusEffects(null);
-  renderIncomingPreview();
+  battleCalloutView.reset();
+  renderStatusEffectsView({
+    container: statusEffects,
+    countValue: statusCountValue,
+    hasStarted: false,
+    playerState: null,
+    isMobile: detectMobile(),
+    skillManager: getPlayerSkillManager(),
+    feverStatus: getFeverStatus(),
+    nowMs: performance.now(),
+  });
+  renderIncomingPreviewView({
+    valueEl: incomingValue,
+    queueEl: incomingQueue,
+    hasStarted: false,
+    pendingAttacks: [],
+    isMobile: detectMobile(),
+  });
   syncRecentBattleCard();
   syncRotateHint();
   if (!uiSettings.briefingSeen) {
