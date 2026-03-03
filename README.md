@@ -7,7 +7,7 @@
 ### 소개
 좌측 플레이어 vs 우측 AI 대전 테트리스 게임입니다. 현대적인 네온 UI와 화려한 시각 효과, 풍부한 게임성을 갖춘 프로덕션급 웹 게임입니다.
 
-### 주요 기능 (v3.20.0)
+### 주요 기능 (v3.20.1)
 - 🎮 **3가지 필살기 스킬**: 블라인드(1), 블록 스왑(2), 가비지 반사(3)
 - 🔥 **피버 모드**: 10콤보+ 시 BGM 1.3배속 + 공격력 1.5배
 - 💣 **아이템 시스템**: 폭탄(3x3 파괴), 별(1줄 클리어), 실드(가비지 차단)
@@ -36,6 +36,7 @@
 - 📱 **Mobile Independent Web App**: 모바일은 `mobile.html + mobile.css + main_mobile.js + mobile_renderer.js` 조합의 별도 웹앱으로 동작하며, 데스크톱 `main.js`와 직접 결합하지 않는다
 - 📲 **Dual Entry Strategy**: 데스크톱은 `index.html`, 모바일은 `mobile.html`로 진입하며 접속 환경에 따라 자동 분기한다
 - 🧱 **Shared Battle Engine**: `core / battle / audio / AI / 전투 규칙`은 공유하고, 앱 셸과 HUD/오버레이/버튼/렌더는 분리한다
+- 📏 **Logical Canvas Scaling Fix**: 모바일 전투 보드는 backing store가 아니라 실제 CSS 픽셀 기준 크기로 렌더되어, 고해상도 스마트폰에서도 블록과 보드가 과대 확대되지 않는다
 - 🧪 **Adapter Path Deprecated**: `create_game_session`, `hud_renderer`, `feedback_view`, `overlay_view`, `overlay_controller` 기반 점진 분리 경로는 중간 실험으로만 남기고 최종 구조에서 재판단한다
 - 🛡️ **Layer Counter Matrix**: `Forge Break / Guard Lattice / Scan Trace / Surge Echo`가 잔상 행을 소모해 공격을 절삭, 무효화, 역교란, 역압박한다
 - 🧪 **Final DEV Polish**: DEV PANEL에 `shift / residue / resonance / counter` 메타와 세션 카운터를 추가해 장시간 튜닝이 쉬워졌다
@@ -69,6 +70,7 @@
 - 일반 일시정지 화면이 보이는 동안에는 이동/회전/드롭 입력이 차단되며, `Esc`/`P`만 재개 토글로 허용됩니다.
 - 아래 방향키로 바닥까지 내려도 `Space`를 누를 필요는 없으며, 바닥 접촉 후 짧은 락 딜레이 뒤 자동 고정됩니다.
 - 모바일에서는 하단 버튼 `1 / 2 / 3`으로 스킬을 사용하며, 게이지 MAX 시에만 활성화됩니다.
+- 모바일 전투에서 보드/블록/전장 이펙트는 기기 DPR이 아니라 실제 화면에 배치된 크기를 기준으로 렌더됩니다.
 - 소리가 작으면 상단 `SETTINGS`에서 `MASTER / BGM / SFX / VOICE`를 각각 올리고, 필요하면 `ARCADE` 또는 `CINEMATIC` 프리셋과 `TEST MIX`로 바로 확인하세요.
 - 모바일에서는 `SETTINGS`에서 `LAYOUT`, `BUTTON SIZE`, `REPEAT`, `HAPTIC LEVEL`을 조절하고, 세로 화면에서는 회전 힌트를 따르세요.
 - `SETTINGS`가 큰 화면에서도 너무 길게 보이면 내부 스크롤이 생기도록 조정되어 있으며, 데스크톱에서는 3컬럼으로 배치됩니다.

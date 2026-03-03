@@ -587,6 +587,47 @@ function drawNeonOverlay(ctx, state, cell, canvas, now) {
   ctx.restore();
 }
 
+/**
+ * [v3.20.1] 캔버스의 논리 렌더 크기를 계산한다.
+ *
+ * 변경사항:
+ *   - 기존 구현은 backing store 크기(canvas.width/canvas.height)를 그대로 사용했다.
+ *   - DPR이 높은 모바일에서는 이 값이 CSS 픽셀보다 커져, 보드와 블록이 화면 밖으로 확대되는 문제가 있었다.
+ *   - 이제 style.width/style.height, dataset.cellSize, getBoundingClientRect()를 우선 사용한다.
+ *
+ * @param {HTMLCanvasElement} canvas - 대상 캔버스
+ * @param {number} cols - 열 수
+ * @param {number} rows - 행 수
+ * @returns {{width:number,height:number,cell:number}} 논리 렌더 크기
+ */
+function getCanvasLogicalMetrics(canvas, cols = 10, rows = 20) {
+  const styleWidth = Number.parseFloat(canvas?.style?.width || "");
+  const styleHeight = Number.parseFloat(canvas?.style?.height || "");
+  const rect = canvas?.getBoundingClientRect?.();
+  const rectWidth = rect?.width || 0;
+  const rectHeight = rect?.height || 0;
+  const datasetCell = Number.parseFloat(canvas?.dataset?.cellSize || "");
+  const dpr = Math.max(1, window.devicePixelRatio || 1);
+
+  const cell = Math.max(
+    1,
+    (Number.isFinite(datasetCell) && datasetCell > 0 ? datasetCell : 0)
+    || (Number.isFinite(styleWidth) && styleWidth > 0 ? styleWidth / cols : 0)
+    || (rectWidth > 0 ? rectWidth / cols : 0)
+    || (canvas?.width ? (canvas.width / dpr) / cols : 0)
+    || 24,
+  );
+
+  const width = (Number.isFinite(styleWidth) && styleWidth > 0 ? styleWidth : 0)
+    || rectWidth
+    || cell * cols;
+  const height = (Number.isFinite(styleHeight) && styleHeight > 0 ? styleHeight : 0)
+    || rectHeight
+    || cell * rows;
+
+  return { width, height, cell };
+}
+
 function drawStyledCell(ctx, x, y, cell, color, options = {}) {
   if (document.body?.classList.contains("mobile-shell")) {
     const inset = Math.max(1, options.inset ?? 1);
@@ -684,8 +725,9 @@ function drawStyledCell(ctx, x, y, cell, color, options = {}) {
  */
 function drawBoard(ctx, state, board, fx) {
   const canvas = ctx.canvas;
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-  const cell = canvas.width / 10;
+  const logical = getCanvasLogicalMetrics(canvas, 10, 20);
+  ctx.clearRect(0, 0, logical.width, logical.height);
+  const cell = logical.cell;
   const now = performance.now();
   const skillManager = getSkillManagerForState(state);
   
@@ -695,17 +737,17 @@ function drawBoard(ctx, state, board, fx) {
   for (let x = 0; x <= 10; x++) {
     ctx.beginPath();
     ctx.moveTo(x * cell, 0);
-    ctx.lineTo(x * cell, canvas.height);
+    ctx.lineTo(x * cell, logical.height);
     ctx.stroke();
   }
   for (let y = 0; y <= 20; y++) {
     ctx.beginPath();
     ctx.moveTo(0, y * cell);
-    ctx.lineTo(canvas.width, y * cell);
+    ctx.lineTo(logical.width, y * cell);
     ctx.stroke();
   }
 
-  drawNeonOverlay(ctx, state, cell, canvas, now);
+  drawNeonOverlay(ctx, state, cell, { width: logical.width, height: logical.height }, now);
   
   // 고정된 블록 렌더링
   for (let y = 0; y < 20; y++) {
@@ -780,18 +822,18 @@ function drawBoard(ctx, state, board, fx) {
   fx.draw(ctx);
 
   if (skillManager.isBlindActive()) {
-    renderBlindEffect(ctx, 0, 0, canvas.width, canvas.height);
+    renderBlindEffect(ctx, 0, 0, logical.width, logical.height);
   }
 
   if (skillManager.isGarbageReflectActive()) {
-    renderGarbageReflectEffect(ctx, 0, 0, canvas.width, canvas.height, now);
+    renderGarbageReflectEffect(ctx, 0, 0, logical.width, logical.height, now);
   }
 
   renderSwapAnimation(ctx, 0, 0, cell, state.id);
 
   if (state.darknessUntil > now) {
     ctx.fillStyle = "rgba(5, 8, 16, 0.82)";
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillRect(0, 0, logical.width, logical.height);
   }
 
   if (state.mirrorMoveUntil > now) {
@@ -799,7 +841,7 @@ function drawBoard(ctx, state, board, fx) {
     ctx.fillStyle = "rgba(255, 77, 158, 0.85)";
     ctx.font = 'bold 16px "Segoe UI", sans-serif';
     ctx.textAlign = "center";
-    ctx.fillText("MIRROR", canvas.width / 2, 22);
+    ctx.fillText("MIRROR", logical.width / 2, 22);
     ctx.restore();
   }
 }
@@ -1665,7 +1707,7 @@ export function createGame(config) {
     who.state.id = id;
     who.state.inputTuning = { ...(id === "player" ? (config.getInputTuning?.() || INPUT_PRESETS.standard) : INPUT_PRESETS.standard) };
     const canvas = id === "player" ? config.playerCanvas : config.aiCanvas;
-    who.cellSize = canvas.width / who.board.width;
+    who.cellSize = getCanvasLogicalMetrics(canvas, who.board.width, who.board.height).cell;
   }
 
   function syncAiDifficultyState() {

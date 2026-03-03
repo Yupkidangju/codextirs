@@ -13,6 +13,7 @@ body.mobile-shell {
 body.mobile-shell .app {
   height: var(--app-height, 100dvh);
   min-height: var(--app-height, 100dvh);
+  overflow: hidden;
 }
 
 body.mobile-shell .topbar {
@@ -128,13 +129,15 @@ body.mobile-shell .mobile-status-bar .value {
 
 body.mobile-shell #stage.stage {
   position: relative;
-  display: block;
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
+  justify-items: center;
   flex: 1 1 auto;
   min-height: 0;
   padding:
-    8px
+    6px
     calc(12px + var(--safe-right))
-    calc(var(--mobile-controls-height) + 118px + var(--safe-bottom))
+    calc(var(--mobile-controls-height) + 104px + var(--safe-bottom))
     calc(12px + var(--safe-left));
   overflow: hidden;
 }
@@ -145,11 +148,13 @@ body.mobile-shell .lane.player-lane {
   grid-template-columns: 1fr;
   grid-template-rows: auto auto auto;
   justify-items: center;
-  gap: 10px;
+  gap: 8px;
   padding: 0;
   border: none;
   background: transparent;
   box-shadow: none;
+  width: 100%;
+  max-width: 280px;
 }
 
 body.mobile-shell .lane.player-lane .lane-title,
@@ -161,12 +166,12 @@ body.mobile-shell .lane.player-lane .board-wrap {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: auto;
-  height: min(calc(var(--app-height, 100dvh) - 370px), 58vh);
-  min-height: 280px;
+  width: min(52vw, 210px);
+  height: min(calc(var(--app-height, 100dvh) - 410px), 42vh, 420px);
+  min-height: 220px;
   aspect-ratio: 1 / 2;
-  padding: 10px;
-  border-radius: 22px;
+  padding: 8px;
+  border-radius: 18px;
   background:
     linear-gradient(180deg, rgba(5, 12, 22, 0.96) 0%, rgba(10, 18, 34, 0.88) 100%);
   border: 1px solid rgba(100, 180, 255, 0.18);
@@ -179,29 +184,29 @@ body.mobile-shell .lane.player-lane #playerCanvas {
 
 body.mobile-shell .player-side {
   display: grid;
-  grid-template-columns: minmax(86px, 0.8fr) minmax(0, 1fr);
-  gap: 10px;
-  width: min(100%, 420px);
+  grid-template-columns: 74px minmax(0, 1fr);
+  gap: 8px;
+  width: min(100%, 280px);
   align-items: start;
 }
 
 body.mobile-shell .hold-preview,
 body.mobile-shell .next-preview {
-  padding: 10px;
-  border-radius: 14px;
+  padding: 8px;
+  border-radius: 12px;
   background: rgba(9, 16, 30, 0.9);
   border: 1px solid rgba(100, 180, 255, 0.14);
 }
 
 body.mobile-shell .hold-preview canvas {
-  width: 74px !important;
-  height: 74px !important;
+  width: 58px !important;
+  height: 58px !important;
 }
 
 body.mobile-shell .next-preview {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 6px;
+  gap: 4px;
 }
 
 body.mobile-shell .next-preview .label {
@@ -209,8 +214,8 @@ body.mobile-shell .next-preview .label {
 }
 
 body.mobile-shell .next-preview canvas {
-  width: 48px !important;
-  height: 36px !important;
+  width: 34px !important;
+  height: 26px !important;
 }
 
 body.mobile-shell .next-preview .extra-next {
@@ -219,11 +224,11 @@ body.mobile-shell .next-preview .extra-next {
 
 body.mobile-shell .lane.ai-lane {
   position: absolute;
-  top: 12px;
+  top: 6px;
   right: calc(12px + var(--safe-right));
-  width: 110px;
-  padding: 8px;
-  border-radius: 16px;
+  width: 88px;
+  padding: 6px;
+  border-radius: 12px;
   background: rgba(8, 15, 28, 0.9);
   border: 1px solid rgba(255, 255, 255, 0.08);
   backdrop-filter: blur(8px);
@@ -243,8 +248,8 @@ body.mobile-shell .lane.ai-lane .board-wrap {
 }
 
 body.mobile-shell .lane.ai-lane canvas {
-  width: 82px !important;
-  height: 164px !important;
+  width: 60px !important;
+  height: 120px !important;
 }
 
 body.mobile-shell .ai-side {
@@ -252,33 +257,33 @@ body.mobile-shell .ai-side {
 }
 
 body.mobile-shell .ai-side .hud-panel {
-  padding: 6px 7px;
-  border-radius: 10px;
+  padding: 4px 5px;
+  border-radius: 8px;
 }
 
 body.mobile-shell .ai-side .label {
-  font-size: 0.54rem;
+  font-size: 0.48rem;
 }
 
 body.mobile-shell .ai-side .value {
-  font-size: 0.72rem;
+  font-size: 0.62rem;
 }
 
 body.mobile-shell .battle-widgets {
   position: fixed;
   left: calc(12px + var(--safe-left));
   right: calc(12px + var(--safe-right));
-  bottom: calc(var(--mobile-controls-height) + 10px + var(--safe-bottom));
+  bottom: calc(var(--mobile-controls-height) + 6px + var(--safe-bottom));
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 8px;
+  gap: 6px;
   z-index: 8;
 }
 
 body.mobile-shell .widget-card {
   min-width: 0;
-  padding: 10px;
-  border-radius: 14px;
+  padding: 8px;
+  border-radius: 12px;
   backdrop-filter: blur(10px);
 }
 
@@ -293,8 +298,8 @@ body.mobile-shell .incoming-queue {
 
 body.mobile-shell .status-chip,
 body.mobile-shell .incoming-chip {
-  font-size: 0.64rem;
-  padding: 6px 8px;
+  font-size: 0.58rem;
+  padding: 5px 7px;
 }
 
 body.mobile-shell .mobile-controls {
@@ -319,8 +324,8 @@ body.mobile-shell .mobile-controls {
 
 body.mobile-shell .mobile-controls button {
   min-width: 0;
-  min-height: 62px;
-  height: clamp(62px, calc(var(--mobile-btn-size) + 8px), 88px);
+  min-height: 68px;
+  height: clamp(68px, calc(var(--mobile-btn-size) + 14px), 96px);
   border-radius: 18px;
   border: 1px solid rgba(100, 180, 255, 0.18);
   background:
@@ -381,24 +386,26 @@ body.mobile-shell .center-panel .skills-panel {
 
 @media (orientation: landscape) {
   body.mobile-shell #stage.stage {
-    padding-bottom: calc(var(--mobile-controls-height) + 32px + var(--safe-bottom));
+    padding-bottom: calc(var(--mobile-controls-height) + 20px + var(--safe-bottom));
   }
 
   body.mobile-shell .lane.player-lane .board-wrap {
-    height: min(calc(var(--app-height, 100dvh) - 240px), 74vh);
+    width: min(34vw, 150px);
+    height: min(calc(var(--app-height, 100dvh) - 220px), 34vh, 300px);
+    min-height: 170px;
   }
 
   body.mobile-shell .player-side {
-    width: auto;
-    min-width: 320px;
+    width: min(100%, 240px);
+    min-width: 0;
   }
 
   body.mobile-shell .lane.ai-lane {
-    width: 126px;
+    width: 76px;
   }
 
   body.mobile-shell .lane.ai-lane canvas {
-    width: 96px !important;
-    height: 192px !important;
+    width: 48px !important;
+    height: 96px !important;
   }
 }

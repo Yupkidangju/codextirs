@@ -8,6 +8,14 @@
 
 ## [Unreleased]
 
+## [3.20.1] - 2026-03-03
+
+### 수정됨 (Fixed)
+- 모바일 배틀 보드 과대 렌더링 수정
+  - 전투 렌더 엔진이 `canvas.width` backing store 크기를 셀 기준으로 사용하던 문제를 수정하고, CSS 픽셀 기준 논리 크기(`style.width`, `getBoundingClientRect`, `dataset.cellSize`)를 우선 사용하도록 변경
+  - DPR이 높은 스마트폰에서 전투 진입 후 플레이어/AI 보드와 블록이 비정상적으로 커져 화면을 벗어나던 문제를 완화
+  - `darkness`, `mirror`, `blind`, `reflect`, `Neon Overlay` 같은 전체 보드 이펙트도 실제 화면 기준 크기에 맞춰 렌더되도록 정렬
+
 ## [3.20.0] - 2026-03-03
 
 ### 추가됨 (Added)

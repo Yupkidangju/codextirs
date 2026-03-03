@@ -172,15 +172,17 @@ export function createMobileCanvasManager(config) {
   function getPlayerCellSize() {
     const boardWrap = getPlayerBoardWrap();
     if (!boardWrap) return 18;
-    const h = Math.floor(boardWrap.clientHeight / 20);
-    const w = Math.floor(boardWrap.clientWidth / 10);
-    return Math.max(12, Math.min(h || 999, w || 999, 28));
+    const portrait = window.matchMedia("(orientation: portrait)").matches;
+    const h = Math.floor((boardWrap.clientHeight - 4) / 20);
+    const w = Math.floor((boardWrap.clientWidth - 4) / 10);
+    const ceiling = portrait ? 16 : 11;
+    return Math.max(7, Math.min(h || 999, w || 999, ceiling));
   }
 
   function resizeAll() {
     const playerCellSize = getPlayerCellSize();
-    const aiCellSize = Math.max(5, Math.floor(playerCellSize * 0.4));
-    const previewCellSize = Math.max(14, Math.min(24, Math.floor(playerCellSize * 0.9)));
+    const aiCellSize = Math.max(4, Math.floor(playerCellSize * 0.4));
+    const previewCellSize = Math.max(8, Math.min(16, Math.floor(playerCellSize * 0.9)));
 
     resizeCanvas(playerCanvas, 10, 20, playerCellSize);
     resizeCanvas(aiCanvas, 10, 20, aiCellSize);
