@@ -439,13 +439,10 @@ body.mobile-shell .mobile-settings-control {
 }
 
 body.mobile-shell .lane.player-lane {
+  position: relative;
   width: 100%;
-  max-width: 252px;
-  display: grid;
-  grid-template-columns: 54px minmax(0, 1fr);
-  grid-template-areas: "side board";
-  gap: 8px;
-  justify-items: stretch;
+  max-width: 250px;
+  min-height: min(43vh, 408px);
 }
 
 body.mobile-shell .board-wrap {
@@ -455,10 +452,10 @@ body.mobile-shell .board-wrap {
 }
 
 body.mobile-shell .lane.player-lane .board-wrap {
-  grid-area: board;
-  width: min(47vw, 188px);
+  margin-left: 42px;
+  width: min(50vw, 196px);
   aspect-ratio: 1 / 2;
-  max-height: min(39vh, 376px);
+  max-height: min(43vh, 412px);
   padding: 8px;
   border-radius: 18px;
   background: linear-gradient(180deg, rgba(5, 12, 22, 0.96) 0%, rgba(10, 18, 34, 0.9) 100%);
@@ -478,16 +475,21 @@ body.mobile-shell .lane.ai-lane canvas {
 }
 
 body.mobile-shell .player-side {
-  grid-area: side;
-  width: 54px;
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 38px;
   display: grid;
   grid-template-columns: 1fr;
-  gap: 6px;
+  gap: 4px;
   align-items: start;
+  justify-items: center;
+  z-index: 2;
 }
 
 body.mobile-shell .block-preview {
-  padding: 8px;
+  width: 100%;
+  padding: 5px 3px;
 }
 
 body.mobile-shell .hold-preview {
@@ -497,7 +499,7 @@ body.mobile-shell .hold-preview {
 body.mobile-shell .next-preview {
   display: grid;
   grid-template-columns: 1fr;
-  gap: 5px;
+  gap: 3px;
   justify-items: center;
 }
 
@@ -508,8 +510,8 @@ body.mobile-shell .next-preview .label {
 }
 
 body.mobile-shell .next-preview canvas {
-  width: 42px !important;
-  height: 24px !important;
+  width: 28px !important;
+  height: 18px !important;
 }
 
 body.mobile-shell .next-preview .extra-next {
