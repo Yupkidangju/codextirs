@@ -166,9 +166,9 @@ body.mobile-shell .lane.player-lane .board-wrap {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: min(52vw, 210px);
-  height: min(calc(var(--app-height, 100dvh) - 410px), 42vh, 420px);
-  min-height: 220px;
+  width: min(42vw, 168px) !important;
+  height: min(calc(var(--app-height, 100dvh) - 500px), 31vh, 336px) !important;
+  min-height: 168px !important;
   aspect-ratio: 1 / 2;
   padding: 8px;
   border-radius: 18px;
@@ -179,6 +179,10 @@ body.mobile-shell .lane.player-lane .board-wrap {
 }
 
 body.mobile-shell .lane.player-lane #playerCanvas {
+  width: 100% !important;
+  height: 100% !important;
+  max-width: 100% !important;
+  max-height: 100% !important;
   image-rendering: auto;
 }
 
@@ -226,7 +230,7 @@ body.mobile-shell .lane.ai-lane {
   position: absolute;
   top: 6px;
   right: calc(12px + var(--safe-right));
-  width: 88px;
+  width: 72px !important;
   padding: 6px;
   border-radius: 12px;
   background: rgba(8, 15, 28, 0.9);
@@ -248,8 +252,10 @@ body.mobile-shell .lane.ai-lane .board-wrap {
 }
 
 body.mobile-shell .lane.ai-lane canvas {
-  width: 60px !important;
-  height: 120px !important;
+  width: 42px !important;
+  height: 84px !important;
+  max-width: 42px !important;
+  max-height: 84px !important;
 }
 
 body.mobile-shell .ai-side {
@@ -390,9 +396,9 @@ body.mobile-shell .center-panel .skills-panel {
   }
 
   body.mobile-shell .lane.player-lane .board-wrap {
-    width: min(34vw, 150px);
-    height: min(calc(var(--app-height, 100dvh) - 220px), 34vh, 300px);
-    min-height: 170px;
+    width: min(28vw, 132px) !important;
+    height: min(calc(var(--app-height, 100dvh) - 240px), 28vh, 264px) !important;
+    min-height: 132px !important;
   }
 
   body.mobile-shell .player-side {
@@ -401,11 +407,11 @@ body.mobile-shell .center-panel .skills-panel {
   }
 
   body.mobile-shell .lane.ai-lane {
-    width: 76px;
+    width: 64px !important;
   }
 
   body.mobile-shell .lane.ai-lane canvas {
-    width: 48px !important;
-    height: 96px !important;
+    width: 36px !important;
+    height: 72px !important;
   }
 }

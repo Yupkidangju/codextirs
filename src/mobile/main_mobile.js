@@ -852,6 +852,9 @@ async function beginBattle() {
   appState.activeOverlay = null;
   setHidden(dom.startScreen, true);
   setHidden(dom.mobileControls, false);
+  // [v3.20.2] 시작 오버레이가 사라진 직후 실제 전투 영역 크기를 다시 읽어 모바일 캔버스를 강제 재조정한다.
+  canvasManager.resizeAll();
+  requestAnimationFrame(() => canvasManager.resizeAll());
   closePauseOverlay();
   hideResultOverlay();
   game.reset();
